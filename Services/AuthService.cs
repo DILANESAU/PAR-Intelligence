@@ -4,9 +4,10 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-using WPF_PAR.MVVM.Models;
+using WPF_PAR.Core.Models;
+using WPF_PAR.Core.Services;
 
-using static WPF_PAR.Services.SqlHelper;
+using static WPF_PAR.Core.Services.SqlHelper;
 
 namespace WPF_PAR.Services
 {

@@ -2,11 +2,10 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-using WPF_PAR.MVVM.Models;
+using WPF_PAR.Core.Models;
 
-using static WPF_PAR.Services.SqlHelper;
 
-namespace WPF_PAR.Services
+namespace WPF_PAR.Core.Services
 {
     public class ReportesService
     {
@@ -16,13 +15,6 @@ namespace WPF_PAR.Services
         {
             _sqlHelper = new SqlHelper(TipoConexion.Data);
         }
-
-        // =========================================================================
-        // SECCIÓN 1: REPORTES DETALLADOS (Productos, Líneas, Familias)
-        // Usado por: FamiliaViewModel
-        // =========================================================================
-
-
 
         public async Task<List<VentaReporteModel>> ObtenerVentasBrutasRango(int sucursal, DateTime inicio, DateTime fin)
         {
@@ -315,8 +307,6 @@ GROUP BY
                 FechaEmision = new DateTime(anio, 1, 1)
             });
         }
-
-        // En ReportesService.cs
 
         public async Task<List<GraficoPuntoModel>> ObtenerTendenciaGrafica(int sucursalId, DateTime inicio, DateTime fin, bool agruparPorMes)
         {

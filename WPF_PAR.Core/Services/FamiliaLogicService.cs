@@ -4,9 +4,9 @@ using System.Linq;
 using System.Text;
 
 using WPF_PAR.Core;
-using WPF_PAR.MVVM.Models;
+using WPF_PAR.Core.Models;
 
-namespace WPF_PAR.Services
+namespace WPF_PAR.Core.Services
 {
     public class FamiliaLogicService
     {

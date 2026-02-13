@@ -2,12 +2,6 @@
 
 using Microsoft.Data.SqlClient;
 
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
-
-using WPF_PAR.Services;
-
 namespace WPF_PAR.Core.Services
 {
     public class SqlHelper
@@ -18,10 +12,6 @@ namespace WPF_PAR.Core.Services
         {
             _connectionString = connectionString;
         }
-
-        // ====================================================================
-        // MÉTODO NUEVO: Para el botón "Probar Conexión"
-        // ====================================================================
         public async Task<bool> ProbarConexionAsync()
         {
             try
@@ -43,6 +33,36 @@ namespace WPF_PAR.Core.Services
         // ====================================================================
         // TUS MÉTODOS EXISTENTES (Sin cambios lógicos, solo siguen usando _connectionString)
         // ====================================================================
+
+        // En SqlHelper.cs, dentro de la clase SqlHelper
+
+        // MÉTODO NUEVO: Para ejecutar INSERT, UPDATE, DELETE o MERGE
+        public async Task<int> ExecuteAsync(string query, Dictionary<string, object> parameters)
+        {
+            using ( var conexion = new SqlConnection(_connectionString) )
+            {
+                await conexion.OpenAsync();
+                using ( var comando = new SqlCommand(query, conexion) )
+                {
+                    if ( parameters != null )
+                    {
+                        foreach ( var param in parameters )
+                        {
+                            // Manejo de nulos
+                            comando.Parameters.AddWithValue(param.Key, param.Value ?? DBNull.Value);
+                        }
+                    }
+                    try
+                    {
+                        return await comando.ExecuteNonQueryAsync(); // Retorna filas afectadas
+                    }
+                    catch ( Exception ex )
+                    {
+                        throw new Exception($"Error al ejecutar comando SQL: {ex.Message}", ex);
+                    }
+                }
+            }
+        }
         public async Task<List<T>> QueryAsync<T>(string query, Dictionary<string, object> parameters, Func<SqlDataReader, T> mapFunction)
         {
             var lista = new List<T>();
