@@ -1,0 +1,26 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<configuration>
+	<configSections>
+  <sectionGroup name="userSettings" type="System.Configuration.UserSettingsGroup, System, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089" >
+   <section name="WPF_PAR.Properties.Settings" type="System.Configuration.ClientSettingsSection, System, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089" allowExeDefinition="MachineToLocalUser" requirePermission="false" />
+  </sectionGroup>
+ </configSections>
+ <connectionStrings>
+		<add name="SQLServerConnection"
+    connectionString="CADENA DE CONEXION SQL"
+    providerName="System.Data.SqlClient"/>
+	</connectionStrings>
+ <userSettings>
+  <WPF_PAR.Properties.Settings>
+   <setting name="IsDarkMode" serializeAs="String">
+    <value>False</value>
+   </setting>
+   <setting name="PrimayColor" serializeAs="String">
+    <value>Purple</value>
+   </setting>
+   <setting name="SucursalDefaultId" serializeAs="String">
+    <value>0</value>
+   </setting>
+  </WPF_PAR.Properties.Settings>
+ </userSettings>
+</configuration>

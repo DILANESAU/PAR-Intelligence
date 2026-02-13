@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="PAR.WorkerService/PAR.WorkerService.csproj" />
+  <Project Path="WPF PAR.csproj" />
+  <Project Path="WPF_PAR.Core/WPF_PAR.Core.csproj" />
+</Solution>

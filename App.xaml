@@ -1,0 +1,202 @@
+﻿<Application x:Class="WPF_PAR.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:WPF_PAR"
+             xmlns:core="clr-namespace:WPF_PAR.Core" 
+             xmlns:converters="clr-namespace:WPF_PAR.Core.Converters"
+             xmlns:model="clr-namespace:WPF_PAR.MVVM.Models"
+             xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <materialDesign:BundledTheme BaseTheme="Light" PrimaryColor="DeepPurple" SecondaryColor="Lime"/>
+                <ResourceDictionary Source="pack://application:,,,/MaterialDesignThemes.Wpf;component/Themes/MaterialDesign2.Defaults.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+
+            <DataTemplate DataType="{x:Type model:NotificationAlert}">
+                <Grid VerticalAlignment="Center">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <materialDesign:PackIcon x:Name="IconoNotif" Kind="InformationCircle" 
+                                         Width="24" Height="24" VerticalAlignment="Center" Margin="0,0,10,0"/>
+
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding Title}" FontWeight="Bold" FontSize="14"/>
+                        <TextBlock Text="{Binding Message}" FontSize="12"/>
+                    </StackPanel>
+                </Grid>
+
+                <DataTemplate.Triggers>
+                    <DataTrigger Binding="{Binding Type}" Value="Success">
+                        <Setter TargetName="IconoNotif" Property="Kind" Value="CheckCircle"/>
+                        <Setter TargetName="IconoNotif" Property="Foreground" Value="LightGreen"/>
+                    </DataTrigger>
+                    <DataTrigger Binding="{Binding Type}" Value="Error">
+                        <Setter TargetName="IconoNotif" Property="Kind" Value="AlertCircle"/>
+                        <Setter TargetName="IconoNotif" Property="Foreground" Value="#FF8A80"/>
+                    </DataTrigger>
+                </DataTemplate.Triggers>
+            </DataTemplate>
+
+            <Style x:Key="LoadingOverlayStyle" TargetType="Grid">
+                <Setter Property="Background" Value="#CCFFFFFF"/>
+                <Setter Property="Visibility" Value="Collapsed"/>
+                <Setter Property="ZIndex" Value="999"/>
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding IsLoading}" Value="True">
+                        <Setter Property="Visibility" Value="Visible"/>
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+
+            <Style x:Key="PageTitleStyle" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="28"/>
+                <Setter Property="FontWeight" Value="Bold"/>
+                <Setter Property="Foreground" Value="{DynamicResource MaterialDesignBody}"/>
+                <Setter Property="VerticalAlignment" Value="Center"/>
+            </Style>
+
+            <Style x:Key="PageSubtitleStyle" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="14"/>
+                <Setter Property="Foreground" Value="{DynamicResource MaterialDesignBody}"/>
+                <Setter Property="Opacity" Value="0.6"/>
+                <Setter Property="Margin" Value="0,4,0,0"/>
+                <Setter Property="VerticalAlignment" Value="Center"/>
+            </Style>
+
+            <Style x:Key="CellMoney" TargetType="TextBlock">
+                <Setter Property="HorizontalAlignment" Value="Right"/>
+                <Setter Property="VerticalAlignment" Value="Center"/>
+                <Setter Property="Margin" Value="0,0,10,0"/>
+                <Setter Property="Foreground" Value="{DynamicResource MaterialDesignBody}"/>
+            </Style>
+
+            <Style x:Key="FilterBarStyle" TargetType="materialDesign:Card">
+                <Setter Property="Background" Value="{DynamicResource MaterialDesignPaper}"/>
+                <Setter Property="Padding" Value="15"/>
+                <Setter Property="UniformCornerRadius" Value="12"/>
+                <Setter Property="Margin" Value="0,0,0,20"/>
+                <Setter Property="materialDesign:ElevationAssist.Elevation" Value="Dp2"/>
+            </Style>
+
+            <Style x:Key="ContentCardStyle" TargetType="materialDesign:Card">
+                <Setter Property="Background" Value="{DynamicResource MaterialDesignPaper}"/>
+                <Setter Property="Padding" Value="20"/>
+                <Setter Property="UniformCornerRadius" Value="16"/>
+                <Setter Property="Margin" Value="0,0,20,20"/>
+                <Setter Property="materialDesign:ElevationAssist.Elevation" Value="Dp2"/>
+                <Setter Property="VerticalAlignment" Value="Stretch"/>
+            </Style>
+
+            <Style x:Key="KpiCardBaseStyle" TargetType="materialDesign:Card">
+                <Setter Property="Padding" Value="20"/>
+                <Setter Property="UniformCornerRadius" Value="16"/>
+                <Setter Property="Margin" Value="0,0,20,0"/>
+                <Setter Property="materialDesign:ElevationAssist.Elevation" Value="Dp2"/>
+                <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
+                <Setter Property="RenderTransform">
+                    <Setter.Value>
+                        <ScaleTransform ScaleX="1" ScaleY="1"/>
+                    </Setter.Value>
+                </Setter>
+                <Style.Triggers>
+                    <Trigger Property="IsMouseOver" Value="True">
+                        <Setter Property="materialDesign:ElevationAssist.Elevation" Value="Dp4"/>
+                        <Setter Property="RenderTransform">
+                            <Setter.Value>
+                                <ScaleTransform ScaleX="1.03" ScaleY="1.03"/>
+                            </Setter.Value>
+                        </Setter>
+                    </Trigger>
+                </Style.Triggers>
+            </Style>
+
+            <Style x:Key="InteractiveCard" TargetType="materialDesign:Card">
+                <Setter Property="Padding" Value="0"/>
+                <Setter Property="UniformCornerRadius" Value="15"/>
+                <Setter Property="Background" Value="{DynamicResource MaterialDesignPaper}"/>
+                <Setter Property="materialDesign:ElevationAssist.Elevation" Value="Dp2"/>
+                <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
+                <Setter Property="RenderTransform">
+                    <Setter.Value>
+                        <ScaleTransform ScaleX="1" ScaleY="1"/>
+                    </Setter.Value>
+                </Setter>
+                <Style.Triggers>
+                    <Trigger Property="IsMouseOver" Value="True">
+                        <Setter Property="materialDesign:ElevationAssist.Elevation" Value="Dp8"/>
+                        <Setter Property="Cursor" Value="Hand"/>
+                        <Setter Property="RenderTransform">
+                            <Setter.Value>
+                                <ScaleTransform ScaleX="1.03" ScaleY="1.03"/>
+                            </Setter.Value>
+                        </Setter>
+                    </Trigger>
+                </Style.Triggers>
+            </Style>
+
+            <Style x:Key="ModernDataGrid" TargetType="DataGrid" BasedOn="{StaticResource MaterialDesignDataGrid}">
+                <Setter Property="Background" Value="{DynamicResource MaterialDesignPaper}"/>
+                <Setter Property="BorderThickness" Value="0"/>
+                <Setter Property="GridLinesVisibility" Value="Horizontal"/>
+                <Setter Property="HorizontalGridLinesBrush" Value="#1F000000"/>
+                <Setter Property="HeadersVisibility" Value="Column"/>
+                <Setter Property="RowHeight" Value="45"/>
+                <Setter Property="Padding" Value="0"/>
+                <Setter Property="AutoGenerateColumns" Value="False"/>
+                <Setter Property="IsReadOnly" Value="True"/>
+                <Setter Property="CanUserAddRows" Value="False"/>
+                <Setter Property="SelectionMode" Value="Single"/>
+                <Setter Property="Foreground" Value="{DynamicResource MaterialDesignBody}"/>
+
+                <Setter Property="ColumnHeaderStyle">
+                    <Setter.Value>
+                        <Style TargetType="DataGridColumnHeader" BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}">
+                            <Setter Property="FontWeight" Value="Bold"/>
+                            <Setter Property="Foreground" Value="{DynamicResource MaterialDesignBody}"/>
+                            <Setter Property="Opacity" Value="0.7"/>
+                            <Setter Property="FontSize" Value="12"/>
+                            <Setter Property="Padding" Value="15,10"/>
+                            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+                            <Setter Property="Background" Value="Transparent"/>
+                            <Setter Property="BorderThickness" Value="0,0,0,1"/>
+                            <Setter Property="BorderBrush" Value="{DynamicResource MaterialDesignDivider}"/>
+                        </Style>
+                    </Setter.Value>
+                </Setter>
+
+                <Setter Property="CellStyle">
+                    <Setter.Value>
+                        <Style TargetType="DataGridCell" BasedOn="{StaticResource MaterialDesignDataGridCell}">
+                            <Setter Property="Padding" Value="15,0"/>
+                            <Setter Property="BorderThickness" Value="0"/>
+                            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                            <Setter Property="Foreground" Value="{DynamicResource MaterialDesignBody}"/>
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="DataGridCell">
+                                        <Border Padding="{TemplateBinding Padding}" 
+                                                BorderBrush="{TemplateBinding BorderBrush}" 
+                                                BorderThickness="{TemplateBinding BorderThickness}" 
+                                                Background="{TemplateBinding Background}" 
+                                                SnapsToDevicePixels="True">
+                                            <ContentPresenter SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
+                                        </Border>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <converters:BoolToVisConverter x:Key="BoolToVis"/>
+
+            <converters:BoolToColorConverter x:Key="BoolToColorConverter"/>
+
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

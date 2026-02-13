@@ -1,0 +1,33 @@
+﻿<?xml version='1.0' encoding='utf-8'?>
+<SettingsFile xmlns="http://schemas.microsoft.com/VisualStudio/2004/01/settings" CurrentProfile="(Default)" GeneratedClassNamespace="WPF_PAR.Properties" GeneratedClassName="Settings">
+  <Profiles />
+  <Settings>
+    <Setting Name="IsDarkMode" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">False</Value>
+    </Setting>
+    <Setting Name="SucursalDefaultId" Type="System.Int32" Scope="User">
+      <Value Profile="(Default)">0</Value>
+    </Setting>
+    <Setting Name="Data_Server" Type="System.String" Scope="User">
+      <Value Profile="(Default)">192.168.123.211</Value>
+    </Setting>
+    <Setting Name="Data_Db" Type="System.String" Scope="User">
+      <Value Profile="(Default)">General1</Value>
+    </Setting>
+    <Setting Name="Data_User" Type="System.String" Scope="User">
+      <Value Profile="(Default)">Consulta</Value>
+    </Setting>
+    <Setting Name="Auth_Db" Type="System.String" Scope="User">
+      <Value Profile="(Default)">SistemaGestionDB</Value>
+    </Setting>
+    <Setting Name="Auth_User" Type="System.String" Scope="User">
+      <Value Profile="(Default)">sa</Value>
+    </Setting>
+    <Setting Name="Auth_Server" Type="System.String" Scope="User">
+      <Value Profile="(Default)">172.16.90.63</Value>
+    </Setting>
+    <Setting Name="UpgradeRequired" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">True</Value>
+    </Setting>
+  </Settings>
+</SettingsFile>
