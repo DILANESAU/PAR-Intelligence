@@ -1,6 +1,6 @@
 ﻿using WPF_PAR.Core; // Asegúrate de usar tu base ObservableObject
 
-namespace WPF_PAR.MVVM.Models
+namespace WPF_PAR.Core.Models
 {
     public class OpcionColor : ObservableObject
     {
@@ -11,7 +11,7 @@ namespace WPF_PAR.MVVM.Models
         public bool EsSeleccionado
         {
             get => _esSeleccionado;
-            set { _esSeleccionado = value; OnPropertyChanged(); }
+            set { _esSeleccionado = value; PropertyChanged(); }
         }
     }
 }

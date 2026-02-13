@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace WPF_PAR.MVVM.Models
+namespace WPF_PAR.Core.Models
 {
     public class UsuarioModel
     {

@@ -52,8 +52,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\PAR.WorkerService\PAR.WorkerService.csproj" />
-    <ProjectReference Include="PAR.WorkerService\PAR.WorkerService.csproj" />
     <ProjectReference Include="WPF_PAR.Core\WPF_PAR.Core.csproj" />
   </ItemGroup>
 

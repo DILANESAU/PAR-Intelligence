@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Linq; // <--- ¡IMPORTANTÍSIMO PARA USAR .Sum(), .Take(), .Skip()!
 
-namespace WPF_PAR.MVVM.Models
+namespace WPF_PAR.Core.Models
 {
     public class ClienteAnalisisModel
     {

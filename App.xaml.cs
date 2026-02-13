@@ -1,10 +1,14 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
+
 using System.Windows;
-using System.Linq; // Necesario para cerrar ventanas
+using System.Linq;
+
 using WPF_PAR.MVVM.ViewModels;
 using WPF_PAR.MVVM.Views;
 using WPF_PAR.Services;
 using WPF_PAR.Services.Interfaces;
+using WPF_PAR.Core.Services; // IMPORTANT: Using for Core services
+using WPF_PAR.Core.Models;
 
 namespace WPF_PAR
 {
@@ -22,91 +26,76 @@ namespace WPF_PAR
             var services = new ServiceCollection();
 
             // =========================================================================
-            // 1. SERVICIOS DE INFRAESTRUCTURA (UI y Herramientas Locales)
+            // 1. INFRASTRUCTURE SERVICES (UI and Local Tools)
             // =========================================================================
             services.AddSingleton<ThemeService>();
             services.AddSingleton<INotificationService, NotificationService>();
             services.AddSingleton<IDialogService, DialogService>();
             services.AddSingleton<FilterService>();
-            services.AddSingleton<BusinessLogicService>(); // Reglas de negocio visuales
+            services.AddSingleton<BusinessLogicService>();
 
-            // IMPORTANTE: Registramos SecureStorageService para poder usarlo abajo 👇
+            // KEY: Register SecureStorage so we can use it in the factories below
             services.AddSingleton<SecureStorageService>();
 
             // =========================================================================
-            // 2. SERVICIOS DEL CORE (Aquí inyectamos la cadena de conexión) 💉
+            // 2. CORE SERVICES (Injecting Connection Strings) 💉
             // =========================================================================
 
-            // A) REPORTES SERVICE (Lee datos de Intelisis)
+            // A) REPORTES SERVICE (Connects to Intelisis DB)
             services.AddTransient<ReportesService>(provider =>
             {
-                // 1. Pedimos las herramientas necesarias
                 var secure = provider.GetRequiredService<SecureStorageService>();
                 var settings = WPF_PAR.Properties.Settings.Default;
 
-                // 2. Recuperamos la contraseña segura
-                // Si es null (primera vez), ponemos cadena vacía para evitar crash
+                // Recover password. If null (first run), use empty string to avoid crash.
                 string pass = secure.RecuperarPassword(SecureStorageService.KeyData) ?? "";
 
-                // 3. Armamos la cadena de conexión completa
-                string connectionString = $"Data Source={settings.DataServer};Initial Catalog={settings.DataDb};User ID={settings.DataUser};Password={pass};TrustServerCertificate=True;Timeout=60";
+                // Build the connection string dynamically
+                string connectionString = $"Data Source={settings.Data_Server};Initial Catalog={settings.Data_Db};User ID={settings.Data_User};Password={pass};TrustServerCertificate=True;Timeout=60";
 
-                // 4. Creamos y devolvemos el servicio listo
+                // Inject the string into the Core service
                 return new ReportesService(connectionString);
             });
 
-            // B) AUTH SERVICE (Gestiona usuarios en PAR_System_DB)
-            services.AddTransient<AuthService>(provider =>
-            {
-                var secure = provider.GetRequiredService<SecureStorageService>();
-                var settings = WPF_PAR.Properties.Settings.Default;
-                string pass = secure.RecuperarPassword(SecureStorageService.KeyData) ?? "";
-
-                // NOTA: Asumimos que PAR_System_DB está en el mismo servidor que Intelisis
-                // Si estuviera en otro, usarías settings.AuthServer, etc.
-                string connectionString = $"Data Source={settings.DataServer};Initial Catalog=PAR_System_DB;User ID={settings.DataUser};Password={pass};TrustServerCertificate=True";
-
-                return new AuthService(connectionString);
-            });
-
-            // C) SUCURSALES SERVICE (Lee sucursales de Intelisis)
+            // B) SUCURSALES SERVICE (Connects to Intelisis DB)
             services.AddTransient<SucursalesService>(provider =>
             {
                 var secure = provider.GetRequiredService<SecureStorageService>();
                 var settings = WPF_PAR.Properties.Settings.Default;
                 string pass = secure.RecuperarPassword(SecureStorageService.KeyData) ?? "";
 
-                string connectionString = $"Data Source={settings.DataServer};Initial Catalog={settings.DataDb};User ID={settings.DataUser};Password={pass};TrustServerCertificate=True";
+                string connectionString = $"Data Source={settings.Data_Server};Initial Catalog={settings.Data_Db};User ID={settings.Data_User};Password={pass};TrustServerCertificate=True";
 
                 return new SucursalesService(connectionString);
             });
 
-            // D) CACHE DB SERVICE (Nuevo servicio para leer lo que procesa el Worker)
-            // Este servicio leerá de PAR_System_DB para pintar gráficas rápido
-            services.AddTransient<CacheDbService>(provider =>
+            // C) AUTH SERVICE (Connects to PAR_System_DB)
+            services.AddTransient<AuthService>(provider =>
             {
                 var secure = provider.GetRequiredService<SecureStorageService>();
                 var settings = WPF_PAR.Properties.Settings.Default;
                 string pass = secure.RecuperarPassword(SecureStorageService.KeyData) ?? "";
 
-                string connectionString = $"Data Source={settings.DataServer};Initial Catalog=PAR_System_DB;User ID={settings.DataUser};Password={pass};TrustServerCertificate=True";
+                // NOTE: Assuming PAR_System_DB is on the same server as DataServer
+                // If it were separate, you would use settings.AuthServer
+                string connectionString = $"Data Source={settings.Data_Server};Initial Catalog=PAR_System_DB;User ID={settings.Data_User};Password={pass};TrustServerCertificate=True";
 
-                return new CacheDbService(connectionString);
+                return new AuthService(connectionString);
             });
 
             // =========================================================================
-            // 3. LÓGICA DE NEGOCIO (Core Pura)
+            // 3. LOGIC SERVICES (Pure Logic from Core)
             // =========================================================================
-            // Estos servicios no necesitan "Fábrica" especial porque no usan SQL directo,
-            // o porque sus dependencias ya se inyectan automáticamente.
+            // These don't need a factory because they don't use SQL directly or their dependencies are auto-resolved
             services.AddTransient<FamiliaLogicService>();
             services.AddTransient<ClientesLogicService>();
             services.AddTransient<ChartService>();
-            services.AddTransient<ClientesService>(); // Este quizás dependa de ReportesService, y se inyectará solo.
+            services.AddTransient<ClientesService>();
             services.AddTransient<CatalogoService>();
+            services.AddTransient<ExportService>();
 
             // =========================================================================
-            // 4. VISTAS Y MODELOS DE VISTA (MVVM)
+            // 4. VIEW MODELS & VIEWS
             // =========================================================================
             services.AddSingleton<MainViewModel>();
             services.AddTransient<DashboardViewModel>();
@@ -117,13 +106,10 @@ namespace WPF_PAR
 
             services.AddTransient<MainWindow>();
             services.AddTransient<LoginWindow>();
+            services.AddTransient<SettingsView>(); // If you use it as a window or direct view
 
             return services.BuildServiceProvider();
         }
-
-        // =========================================================
-        // AQUÍ ESTÁ EL CAMBIO CLAVE
-        // =========================================================
         protected override void OnStartup(StartupEventArgs e)
         {   
             if ( WPF_PAR.Properties.Settings.Default.UpgradeRequired )
@@ -194,8 +180,6 @@ namespace WPF_PAR
                 // 2. Lo asignamos como vista actual
                 mainViewModel.CurrentView = dashboardVM;
 
-                // 3. ¡ESTA ES LA LÍNEA QUE FALTA! 🚀
-                // Disparamos la carga inicial para que busque las sucursales y datos
                 dashboardVM.CargarDatosIniciales();
             }
 
