@@ -5,6 +5,7 @@ using System.IO;
 using System.Text;
 
 using WPF_PAR.Core.Models;
+using WPF_PAR.Core.Services;
 
 namespace WPF_PAR.Core.Services
 {

@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace WPF_PAR.Core
+namespace WPF_PAR.Core.Configuration
 {
     public static class ConfiguracionLineas
     {

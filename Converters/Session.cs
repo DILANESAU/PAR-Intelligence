@@ -2,9 +2,9 @@
 using System.Collections.Generic;
 using System.Text;
 
-using WPF_PAR.MVVM.Models;
+using WPF_PAR.Core.Models;
 
-namespace WPF_PAR.Core
+namespace WPF_PAR.Converters
 {
     public static class Session
     {

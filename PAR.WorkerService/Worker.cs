@@ -4,6 +4,10 @@ using Microsoft.Data.SqlClient;
 
 using System.Text.Json;
 
+using WPF_PAR.Core.Services;
+
+using WPF_PAR.Core.Models;
+
 namespace PAR.WorkerService
 {
     public class Worker : BackgroundService
@@ -11,120 +15,89 @@ namespace PAR.WorkerService
         private readonly ILogger<Worker> _logger;
         private readonly IConfiguration _configuration;
 
-        string cadenaWorker = _configuration.GetConnectionString("Intelisis");
+        private readonly ReportesService _reportesService;
+        private readonly ClientesService _clientesService;
+        private readonly CacheService _cacheService;
 
-        // 2. Creas el servicio pasándole el string
-        var reportesService = new ReportesService(cadenaWorker);
-        public Worker(ILogger<Worker> logger, IConfiguration configuration)
+        // El constructor recibe todo mágicamente gracias a Program.cs
+        public Worker(ILogger<Worker> logger,
+                      IConfiguration configuration,
+                      ReportesService reportesService,
+                      ClientesService clientesService,
+                      CacheService cacheService)
         {
             _logger = logger;
             _configuration = configuration;
+            _reportesService = reportesService;
+            _clientesService = clientesService;
+            _cacheService = cacheService;
         }
-
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             while ( !stoppingToken.IsCancellationRequested )
             {
-                _logger.LogInformation("⚙️ Iniciando ciclo de procesamiento: {time}", DateTimeOffset.Now);
-
                 try
                 {
-                    // 1. OBTENER CONFIGURACIÓN
-                    string connIntelisis = _configuration.GetConnectionString("Intelisis");
-                    string connPar = _configuration.GetConnectionString("ParSystem");
-                    var sucursales = _configuration.GetSection("Config:SucursalesIds").Get<int[]>();
+                    // 1. Obtener cadenas
+                    string connIntelisis = _config.GetConnectionString("Intelisis");
+                    string connPar = _config.GetConnectionString("ParSystem");
+                    var sucursales = _config.GetSection("Config:SucursalesIds").Get<int[]>();
 
-                    foreach ( var idSucursal in sucursales )
+                    // 2. Instanciar servicios
+                    var reportesService = new ReportesService(connIntelisis);
+                    var familiaLogic = new FamiliaLogicService(); // ¡Tu lógica existente!
+                    var cacheService = new CacheService(connPar); // ¡El nuevo servicio!
+
+                    foreach ( var sucId in sucursales )
                     {
-                        await ProcesarSucursal(idSucursal, connIntelisis, connPar);
+                        _logger.LogInformation($"Procesando Sucursal {sucId}...");
+
+                        // A. LEER (Pesado)
+                        var ventas = await reportesService.ObtenerVentasBrutasRango(sucId, InicioMes(), DateTime.Now);
+
+                        // B. CALCULAR (Lógica de Negocio)
+                        var (arqui, espe) = familiaLogic.CalcularResumenGlobal(ventas);
+                        var todas = arqui.Concat(espe).ToList();
+
+                        // C. GUARDAR (Rápido)
+                        await cacheService.GuardarFamiliasAsync(sucId, todas);
                     }
 
-                    _logger.LogInformation("✅ Ciclo terminado exitosamente.");
+                    _logger.LogInformation("✅ Ciclo completado.");
                 }
                 catch ( Exception ex )
                 {
-                    _logger.LogError(ex, "❌ Error crítico en el Worker");
+                    _logger.LogError(ex, "Error en worker");
                 }
 
-                // Esperar X minutos (Configurable)
-                int minutos = _configuration.GetValue<int>("Config:IntervaloMinutos");
-                await Task.Delay(TimeSpan.FromMinutes(minutos), stoppingToken);
+                await Task.Delay(TimeSpan.FromMinutes(10), stoppingToken);
             }
         }
 
-        private async Task ProcesarSucursal(int idSucursal, string connIntelisis, string connPar)
+        private async Task ProcesarSucursal(int idSucursal)
         {
             _logger.LogInformation($"   > Procesando Sucursal {idSucursal}...");
 
-            using ( var dbIntelisis = new SqlConnection(connIntelisis) )
-            using ( var dbPar = new SqlConnection(connPar) )
-            {
-                string sqlVentas = @"
-                    SELECT 
-                        Articulo, 
-                        SUM(VentaTotal) as Total, 
-                        SUM(Cantidad) as Cantidad 
-                    FROM Venta 
-                    WHERE Sucursal = @Sucursal 
-                      AND FechaEmision BETWEEN @Inicio AND @Fin
-                      AND Estatus = 'CONCLUIDO'
-                    GROUP BY Articulo";
 
-                var inicioMes = new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1);
-                var finMes = DateTime.Now;
+            // 1. Obtener datos complejos de Clientes (con lógica YTD, semestres, etc.)
+            var analisisClientes = await _clientesService.ObtenerDatosBase(DateTime.Now.Year, idSucursal);
 
-                var datosVentas = await dbIntelisis.QueryAsync(sqlVentas, new { Sucursal = idSucursal, Inicio = inicioMes, Fin = finMes });
+            // 2. Calcular totales generales (ejemplo)
+            decimal ventaTotal = analisisClientes.Sum(c => c.VentasMensualesActual.Sum());
+            double litrosTotales = ( double ) analisisClientes.Sum(c => c.LitrosMensualesActual.Sum());
 
-                // ====================================================================
-                // PASO B: PROCESAR EN MEMORIA (Cálculos C#)
-                // ====================================================================
-                decimal ventaMes = datosVentas.Sum(x => ( decimal ) x.Total);
-                double litrosMes = datosVentas.Sum(x => ( double ) x.Cantidad); // Asumiendo que Cantidad son litros aprox para el ejemplo
+            // 3. Serializar la data compleja para que la App solo tenga que leer y deserializar
+            string jsonClientes = JsonSerializer.Serialize(analisisClientes);
 
-                // Generar JSON para Top Productos (Aquí ocurre la magia de la velocidad)
-                var topProductos = datosVentas
-                    .OrderByDescending(x => x.Total)
-                    .Take(10)
-                    .Select(x => new { Nombre = x.Articulo, Valor = x.Total });
+            await _cacheService.GuardarSnapshotAsync(
+                idSucursal,
+                ventaTotal,
+                litrosTotales,
+                jsonClientes
+            );
 
-                string jsonTop = JsonSerializer.Serialize(topProductos);
-
-                // Simulamos gráfica de tendencia (En realidad harías otro query agrupado por día)
-                var tendenciaMock = new[] {
-                    new { Dia = 1, Venta = ventaMes * 0.1m },
-                    new { Dia = 15, Venta = ventaMes * 0.5m },
-                    new { Dia = 30, Venta = ventaMes * 0.4m }
-                };
-                string jsonGrafica = JsonSerializer.Serialize(tendenciaMock);
-
-                // ====================================================================
-                // PASO C: GUARDAR EN PAR_System_DB (Cache)
-                // ====================================================================
-                // Usamos MERGE (o un IF EXISTS UPDATE / ELSE INSERT) para actualizar o crear
-                string sqlGuardar = @"
-                    MERGE Cache_Dashboard AS target
-                    USING (SELECT @IdSucursal AS IdSucursal) AS source
-                    ON (target.IdSucursal = source.IdSucursal)
-                    WHEN MATCHED THEN
-                        UPDATE SET 
-                            VentaMes = @VentaMes,
-                            LitrosMes = @LitrosMes,
-                            JsonTopProductos = @JsonTop,
-                            JsonGraficaTendencia = @JsonGrafica,
-                            FechaActualizacion = GETDATE()
-                    WHEN NOT MATCHED THEN
-                        INSERT (IdSucursal, VentaMes, LitrosMes, JsonTopProductos, JsonGraficaTendencia, FechaActualizacion)
-                        VALUES (@IdSucursal, @VentaMes, @LitrosMes, @JsonTop, @JsonGrafica, GETDATE());";
-
-                await dbPar.ExecuteAsync(sqlGuardar, new
-                {
-                    IdSucursal = idSucursal,
-                    VentaMes = ventaMes,
-                    LitrosMes = litrosMes,
-                    JsonTop = jsonTop,
-                    JsonGrafica = jsonGrafica
-                });
-            }
+            _logger.LogInformation($"   ✅ Sucursal {idSucursal} actualizada. Venta: {ventaTotal:C2}");
         }
+
     }
 }

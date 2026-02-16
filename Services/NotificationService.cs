@@ -6,7 +6,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 
-using WPF_PAR.MVVM.Models;
+using WPF_PAR.Core.Models;
 using WPF_PAR.Services.Interfaces;
 
 namespace WPF_PAR.Services

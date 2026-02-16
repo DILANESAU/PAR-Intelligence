@@ -5,7 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Windows.Controls; // Para PasswordBox
 
-using WPF_PAR.Core;
+using WPF_PAR.Converters;
 using WPF_PAR.Services;
 using WPF_PAR.Services.Interfaces;
 

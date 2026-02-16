@@ -8,7 +8,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-using WPF_PAR.MVVM.Models;
+using WPF_PAR.Core.Models;
 
 namespace WPF_PAR.Services
 {

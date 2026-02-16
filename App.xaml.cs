@@ -7,7 +7,7 @@ using WPF_PAR.MVVM.ViewModels;
 using WPF_PAR.MVVM.Views;
 using WPF_PAR.Services;
 using WPF_PAR.Services.Interfaces;
-using WPF_PAR.Core.Services; // IMPORTANT: Using for Core services
+using WPF_PAR.Core.Services;
 using WPF_PAR.Core.Models;
 
 namespace WPF_PAR

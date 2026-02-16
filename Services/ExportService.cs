@@ -9,7 +9,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 
-using WPF_PAR.MVVM.Models;
+using WPF_PAR.Core.Models;
 
 namespace WPF_PAR.Services
 {

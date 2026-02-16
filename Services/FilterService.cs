@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq; // Necesario para LINQ
 using System.Text;
 
-using WPF_PAR.Core;
+using WPF_PAR.Converters;
 
 namespace WPF_PAR.Services
 {

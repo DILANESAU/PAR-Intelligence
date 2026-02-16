@@ -2,7 +2,7 @@
 using System.Windows;
 using System.Windows.Controls;
 
-using WPF_PAR.Core;
+using WPF_PAR.Converters;
 using WPF_PAR.Services;
 
 namespace WPF_PAR.MVVM.ViewModels

@@ -4,7 +4,7 @@ using System.ComponentModel;
 using System.Text;
 using System.Runtime.CompilerServices;
 
-namespace WPF_PAR.Core
+namespace WPF_PAR.Converters
 {
     public class ObservableObject : INotifyPropertyChanged
     {

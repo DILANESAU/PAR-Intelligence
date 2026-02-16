@@ -2,8 +2,9 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-
 using WPF_PAR.Core;
+using WPF_PAR.Core.Configuration;
+using WPF_PAR.Core.Helpers;
 using WPF_PAR.Core.Models;
 
 namespace WPF_PAR.Core.Services
@@ -57,7 +58,7 @@ namespace WPF_PAR.Core.Services
             {
                 NombreFamilia = nombre,
                 ColorFondo = color,
-                ColorTexto = ColorHelper.ObtenerColorTextto(color),
+                ColorTexto = ColorHelper.ObtenerColorTextoLegible(color),
                 VentaTotal = 0,
                 LitrosTotal = 0, // <--- OJO: Singular, como en el Modelo
                 PorcentajeParticipacion = 0, // <--- Inicializamos en 0
@@ -201,7 +202,7 @@ namespace WPF_PAR.Core.Services
                 {
                     NombreFamilia = nombre,
                     ColorFondo = color,
-                    ColorTexto = ColorHelper.ObtenerColorTextto(color),
+                    ColorTexto = ColorHelper.ObtenerColorTextoLegible(color),
                     VentaTotal = 0
                 };
             }).ToList();

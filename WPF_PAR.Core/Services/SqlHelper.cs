@@ -1,103 +1,68 @@
-﻿
+﻿using Dapper; // <--- ¡Asegúrate de tener este using!
 
 using Microsoft.Data.SqlClient;
+
+using System.Collections.Generic;
+using System.Data;
+using System.Threading.Tasks;
+using System.Linq;
 
 namespace WPF_PAR.Core.Services
 {
     public class SqlHelper
     {
         private readonly string _connectionString;
-        public enum TipoConexion { Auth, Data }
+
         public SqlHelper(string connectionString)
         {
             _connectionString = connectionString;
         }
+
+        // ====================================================================
+        // MÉTODOS CON DAPPER (Lo que necesita CacheService)
+        // ====================================================================
+
+        // Para SELECTs. Mapea automático a tu Modelo.
+        // Acepta parámetros anónimos: new { Id = 1 }
+        public async Task<List<T>> QueryAsync<T>(string sql, object param = null)
+        {
+            using ( var connection = new SqlConnection(_connectionString) )
+            {
+                // No necesitas OpenAsync explícito, Dapper lo maneja, 
+                // pero ponerlo es buena práctica para asegurar la conexión antes.
+                await connection.OpenAsync();
+
+                var result = await connection.QueryAsync<T>(sql, param);
+                return result.AsList();
+            }
+        }
+
+        // Para INSERT, UPDATE, DELETE, MERGE.
+        // Retorna número de filas afectadas.
+        public async Task<int> ExecuteAsync(string sql, object param = null)
+        {
+            using ( var connection = new SqlConnection(_connectionString) )
+            {
+                await connection.OpenAsync();
+                return await connection.ExecuteAsync(sql, param);
+            }
+        }
+
+        // Método de utilidad para validar conexión (Login/Settings)
         public async Task<bool> ProbarConexionAsync()
         {
             try
             {
-                using ( var conexion = new SqlConnection(_connectionString) )
+                using ( var connection = new SqlConnection(_connectionString) )
                 {
-                    await conexion.OpenAsync();
-                    return true; // ¡Éxito!
+                    await connection.OpenAsync();
+                    return true;
                 }
             }
-            catch ( Exception ex )
+            catch
             {
-                // Aquí podrías loguear el error si quisieras
-                System.Diagnostics.Debug.WriteLine("Error conexión: " + ex.Message);
                 return false;
             }
-        }
-
-        // ====================================================================
-        // TUS MÉTODOS EXISTENTES (Sin cambios lógicos, solo siguen usando _connectionString)
-        // ====================================================================
-
-        // En SqlHelper.cs, dentro de la clase SqlHelper
-
-        // MÉTODO NUEVO: Para ejecutar INSERT, UPDATE, DELETE o MERGE
-        public async Task<int> ExecuteAsync(string query, Dictionary<string, object> parameters)
-        {
-            using ( var conexion = new SqlConnection(_connectionString) )
-            {
-                await conexion.OpenAsync();
-                using ( var comando = new SqlCommand(query, conexion) )
-                {
-                    if ( parameters != null )
-                    {
-                        foreach ( var param in parameters )
-                        {
-                            // Manejo de nulos
-                            comando.Parameters.AddWithValue(param.Key, param.Value ?? DBNull.Value);
-                        }
-                    }
-                    try
-                    {
-                        return await comando.ExecuteNonQueryAsync(); // Retorna filas afectadas
-                    }
-                    catch ( Exception ex )
-                    {
-                        throw new Exception($"Error al ejecutar comando SQL: {ex.Message}", ex);
-                    }
-                }
-            }
-        }
-        public async Task<List<T>> QueryAsync<T>(string query, Dictionary<string, object> parameters, Func<SqlDataReader, T> mapFunction)
-        {
-            var lista = new List<T>();
-
-            using ( var conexion = new SqlConnection(_connectionString) )
-            {
-                await conexion.OpenAsync();
-
-                using ( var comando = new SqlCommand(query, conexion) )
-                {
-                    if ( parameters != null )
-                    {
-                        foreach ( var param in parameters )
-                        {
-                            comando.Parameters.AddWithValue(param.Key, param.Value ?? DBNull.Value);
-                        }
-                    }
-
-                    try
-                    {
-                        using ( var lector = await comando.ExecuteReaderAsync() )
-                        {
-                            while ( await lector.ReadAsync() )
-                            {
-                                lista.Add(mapFunction(lector));
-                            }
-                        }
-                    }
-                    catch ( Exception ex )
-                    {
-                        throw new Exception($"Error al ejecutar SQL: {ex.Message}", ex);
-                    }
-                }
-            }
-            return lista;
         }
     }
 }

@@ -3,7 +3,7 @@ using System.Globalization;
 using System.Windows.Data;
 using System.Windows.Media;
 
-namespace WPF_PAR.Core.Converters
+namespace WPF_PAR.Converters
 {
     // 1. BOOL A COLOR (Azul / Gris)
     public class BoolToColorConverter : IValueConverter

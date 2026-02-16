@@ -3,19 +3,20 @@ using System.Collections.Generic;
 using System.Linq; // Necesario para GroupBy, Select, Sum, etc.
 using System.Threading.Tasks;
 
-using WPF_PAR.MVVM.Models;
+using WPF_PAR.Core.Models;
+using WPF_PAR.Core.Services;
 
-using static WPF_PAR.Services.SqlHelper;
+using static WPF_PAR.Core.Services.SqlHelper;
 
-namespace WPF_PAR.Services
+namespace WPF_PAR.Core.Services
 {
     public class ClientesService
     {
         private readonly SqlHelper _sqlHelper;
 
-        public ClientesService()
+        public ClientesService(string connectionString)
         {
-            _sqlHelper = new SqlHelper(TipoConexion.Data);
+            _sqlHelper = new SqlHelper(connectionString);
         }
 
         // ==============================================================================

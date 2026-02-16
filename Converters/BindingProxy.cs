@@ -1,9 +1,9 @@
-﻿        using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Windows;
 
-namespace WPF_PAR.Core
+namespace WPF_PAR.Converters
 {
     public class BindingProxy : Freezable
     {

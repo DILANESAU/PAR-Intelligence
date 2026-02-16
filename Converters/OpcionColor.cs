@@ -1,4 +1,4 @@
-﻿using WPF_PAR.Core; // Asegúrate de usar tu base ObservableObject
+﻿using WPF_PAR.Converters;
 
 namespace WPF_PAR.Core.Models
 {
@@ -11,7 +11,7 @@ namespace WPF_PAR.Core.Models
         public bool EsSeleccionado
         {
             get => _esSeleccionado;
-            set { _esSeleccionado = value; PropertyChanged(); }
+            set { _esSeleccionado = value; OnPropertyChanged(); }
         }
     }
 }

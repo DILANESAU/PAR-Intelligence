@@ -5,7 +5,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
              xmlns:lvc="clr-namespace:LiveChartsCore.SkiaSharpView.WPF;assembly=LiveChartsCore.SkiaSharpView.WPF"
-             xmlns:converters="clr-namespace:WPF_PAR.Core.Converters"
+             xmlns:converters="clr-namespace:WPF_PAR.Converters"
              xmlns:core="clr-namespace:WPF_PAR.Core" 
              mc:Ignorable="d" 
              d:DesignHeight="800" d:DesignWidth="1200"

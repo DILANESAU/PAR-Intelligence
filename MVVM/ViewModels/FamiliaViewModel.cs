@@ -14,8 +14,9 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Data;
 
-using WPF_PAR.Core;
-using WPF_PAR.MVVM.Models;
+using WPF_PAR.Converters;
+using WPF_PAR.Core.Models;
+using WPF_PAR.Core.Services;
 using WPF_PAR.Services;
 using WPF_PAR.Services.Interfaces;
 
@@ -31,6 +32,7 @@ namespace WPF_PAR.MVVM.ViewModels
         private readonly IDialogService _dialogService;
         private readonly INotificationService _notificationService;
         private readonly SucursalesService _sucursalesService;
+        private readonly CacheService _cacheService;
         public FilterService Filters { get; }
 
         private bool _isInitialized = false;
@@ -190,9 +192,10 @@ namespace WPF_PAR.MVVM.ViewModels
             ChartService chartService,
             FamiliaLogicService familiaLogic,
             INotificationService notificationService,
-            SucursalesService sucursalesService)
+            SucursalesService sucursalesService, CacheService cacheService)
         {
             _dialogService = dialogService;
+            _cacheService = cacheService;
             Filters = filterService;
             _chartService = chartService;
             _familiaLogic = familiaLogic;

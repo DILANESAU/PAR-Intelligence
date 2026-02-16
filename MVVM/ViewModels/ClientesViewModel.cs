@@ -13,8 +13,9 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media;
 
-using WPF_PAR.Core;
-using WPF_PAR.MVVM.Models;
+using WPF_PAR.Converters;
+using WPF_PAR.Core.Models;
+using WPF_PAR.Core.Services;
 using WPF_PAR.Services;
 using WPF_PAR.Services.Interfaces;
 

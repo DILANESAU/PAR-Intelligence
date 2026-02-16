@@ -11,9 +11,9 @@ namespace WPF_PAR.Core.Services
     {
         private readonly SqlHelper _sqlHelper;
 
-        public ReportesService()
+        public ReportesService(string connectionString)
         {
-            _sqlHelper = new SqlHelper(TipoConexion.Data);
+            _sqlHelper = new SqlHelper(connectionString);
         }
 
         public async Task<List<VentaReporteModel>> ObtenerVentasBrutasRango(int sucursal, DateTime inicio, DateTime fin)
