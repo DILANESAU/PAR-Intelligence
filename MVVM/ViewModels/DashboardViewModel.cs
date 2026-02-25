@@ -104,15 +104,14 @@ namespace WPF_PAR.MVVM.ViewModels
 
         private bool _isLoading;
         public bool IsLoading { get => _isLoading; set { _isLoading = value; OnPropertyChanged(); } }
-        public DashboardViewModel(string connectionString)
+        public DashboardViewModel(ReportesService reporteServices, SucursalesService sucursalesService, IDialogService dialogService, INotificationService notificationService, FilterService filterService)
         {
-            _reporteServices = new ReportesService(connectionString);
-            _sucursalesService = new SucursalesService(connectionString);
-            
-            _dialogService = new DialogService(); 
-            _notificationService = new NotificationService();
-            Filters = new FilterService(connectionString);
-
+            // Ya no hacemos "new", usamos lo que nos inyecta el App.xaml.cs
+            _reporteServices = reporteServices;
+            _sucursalesService = sucursalesService;
+            _dialogService = dialogService;
+            _notificationService = notificationService;
+            Filters = filterService;
 
             TopProductosList = new ObservableCollection<TopProductoItem>();
             UltimosClientesList = new ObservableCollection<ClienteRecienteItem>();

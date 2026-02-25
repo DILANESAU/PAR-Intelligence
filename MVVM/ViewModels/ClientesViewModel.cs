@@ -202,24 +202,15 @@ namespace WPF_PAR.MVVM.ViewModels
         // =============================================================================
         // CONSTRUCTOR ACTUALIZADO (Recibe string, crea servicios)
         // =============================================================================
-        public ClientesViewModel(string connectionString)
+        public ClientesViewModel(ReportesService reportesService, SucursalesService sucursalesService, ClientesLogicService logicService, CatalogoService catalogoService, IDialogService dialogService, INotificationService notificationService, FilterService filterService)
         {
-            // 1. Inicializamos Servicios de DATOS (Usando la conexión)
-            // NOTA: Asegúrate de que SucursalesService tenga un constructor que acepte string, 
-            // igual que hicimos con ReportesService.
-            _reportesService = new ReportesService(connectionString);
-            _sucursalesService = new SucursalesService(connectionString);
-
-            // 2. Inicializamos Lógica de Negocio (Sin conexión directa usualmente)
-            _logicService = new ClientesLogicService();
-            var businessLogic = new BusinessLogicService(); // Asumiendo que es ligero
-            _catalogoService = new CatalogoService(businessLogic);
-
-            // 3. Inicializamos Servicios de UI
-            // Asumimos que estas clases existen en tu proyecto WPF (Services/DialogService.cs)
-            _dialogService = new DialogService();
-            _notificationService = new NotificationService();
-            Filters = new FilterService(connectionString);
+            _reportesService = reportesService;
+            _sucursalesService = sucursalesService;
+            _logicService = logicService;
+            _catalogoService = catalogoService;
+            _dialogService = dialogService;
+            _notificationService = notificationService;
+            Filters = filterService;
 
             // 4. Configuración inicial
             int year = DateTime.Now.Year;

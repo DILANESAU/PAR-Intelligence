@@ -182,21 +182,18 @@ namespace WPF_PAR.MVVM.ViewModels
         public RelayCommand OrdenarNombreCommand { get; set; }
         public RelayCommand ExportarGlobalCommand { get; set; }
 
-        public FamiliaViewModel(string connectionString)
+        public FamiliaViewModel(ReportesService reportesService, SucursalesService sucursalesService, CatalogoService catalogoService, ChartService chartService, FamiliaLogicService familiaLogic, CacheService cacheService, IDialogService dialogService, INotificationService notificationService, FilterService filterService)
         {
-            _reportesService = new ReportesService(connectionString);
-            _sucursalesService = new SucursalesService(connectionString);
-
-            var businessLogic = new BusinessLogicService(); 
-            _catalogoService = new CatalogoService(businessLogic);
-
-            _chartService = new ChartService();
-            _familiaLogic = new FamiliaLogicService(businessLogic);
-            _cacheService = new CacheService(connectionString);
-
-            _dialogService = new DialogService();
-            _notificationService = new NotificationService();
-            Filters = new FilterService(connectionString);
+            // Asignamos los servicios inyectados
+            _reportesService = reportesService;
+            _sucursalesService = sucursalesService;
+            _catalogoService = catalogoService;
+            _chartService = chartService;
+            _familiaLogic = familiaLogic;
+            _cacheService = cacheService;
+            _dialogService = dialogService;
+            _notificationService = notificationService;
+            Filters = filterService;
 
             _ventasProcesadas = new List<VentaReporteModel>();
             _datosAnualesCache = new List<VentaReporteModel>();

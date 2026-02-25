@@ -72,9 +72,36 @@ namespace WPF_PAR.MVVM.ViewModels
         }
 
         public SnackbarMessageQueue MessageQueue { get; }
-        public MainViewModel(string connectionString)
+
+        // ==============================================================================
+        // CONSTRUCTOR CORREGIDO (Inyección de Dependencias)
+        // Pedimos los ViewModels y Servicios en lugar del connectionString
+        // ==============================================================================
+        public MainViewModel(
+            FilterService filterService,
+            INotificationService notificationService,
+            DashboardViewModel dashboardVM,
+            FamiliaViewModel familiaVM,
+            ClientesViewModel clientesVM,
+            SettingsViewModel settingsVM)
         {
-            // 1. Cargar datos de sesión
+            // 1. Asignamos los servicios inyectados
+            GlobalFilters = filterService;
+            ListaSucursales = GlobalFilters.ListaSucursales;
+
+            // Extraemos la cola de mensajes (asegurando el cast)
+            if ( notificationService is NotificationService ns )
+            {
+                MessageQueue = ns.MessageQueue;
+            }
+
+            // 2. Asignamos los ViewModels que nos entregó App.xaml.cs
+            DashboardVM = dashboardVM;
+            FamiliaVM = familiaVM;
+            ClientesVM = clientesVM;
+            SettingsVM = settingsVM;
+
+            // 3. Cargar datos de sesión
             if ( Session.UsuarioActual != null )
             {
                 UserName = Session.UsuarioActual.NombreCompleto;
@@ -86,17 +113,7 @@ namespace WPF_PAR.MVVM.ViewModels
                 UserRol = "Invitado";
             }
 
-            var notificationService = new NotificationService();
-            MessageQueue = notificationService.MessageQueue;
-
-            GlobalFilters = new FilterService(connectionString);
-            ListaSucursales = GlobalFilters.ListaSucursales;
-
-            DashboardVM = new DashboardViewModel(connectionString);
-            FamiliaVM = new FamiliaViewModel(connectionString);
-            ClientesVM = new ClientesViewModel(connectionString);
-            SettingsVM = new SettingsViewModel(); 
-
+            // 4. Configurar Comandos de Navegación
             DashboardViewCommand = new RelayCommand(o =>
             {
                 CurrentView = DashboardVM;
@@ -129,9 +146,8 @@ namespace WPF_PAR.MVVM.ViewModels
 
             ToggleMenuCommand = new RelayCommand(o => IsMenuOpen = !IsMenuOpen);
 
-            // 5. Vista Inicial
-            CurrentView = DashboardVM;
-            DashboardVM.CargarDatosIniciales();
+            // Nota: La vista inicial ("CurrentView = DashboardVM") ahora 
+            // se maneja desde el App.xaml.cs en la función AbrirMainWindow()
         }
     }
 }

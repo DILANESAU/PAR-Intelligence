@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 
+using System;
 using System.Windows;
 using System.Linq;
 
@@ -31,66 +32,47 @@ namespace WPF_PAR
             services.AddSingleton<ThemeService>();
             services.AddSingleton<INotificationService, NotificationService>();
             services.AddSingleton<IDialogService, DialogService>();
-            services.AddSingleton<FilterService>();
             services.AddSingleton<BusinessLogicService>();
-
-            // KEY: Register SecureStorage so we can use it in the factories below
             services.AddSingleton<SecureStorageService>();
 
             // =========================================================================
             // 2. CORE SERVICES (Injecting Connection Strings) 💉
             // =========================================================================
 
-            // A) REPORTES SERVICE (Connects to Intelisis DB)
-            services.AddTransient<ReportesService>(provider =>
-            {
-                var secure = provider.GetRequiredService<SecureStorageService>();
-                var settings = WPF_PAR.Properties.Settings.Default;
-
-                // Recover password. If null (first run), use empty string to avoid crash.
-                string pass = secure.RecuperarPassword(SecureStorageService.KeyData) ?? "";
-
-                // Build the connection string dynamically
-                string connectionString = $"Data Source={settings.Data_Server};Initial Catalog={settings.Data_Db};User ID={settings.Data_User};Password={pass};TrustServerCertificate=True;Timeout=60";
-
-                // Inject the string into the Core service
-                return new ReportesService(connectionString);
-            });
-
-            // B) SUCURSALES SERVICE (Connects to Intelisis DB)
-            services.AddTransient<SucursalesService>(provider =>
+            // Métodos auxiliares para no repetir el código de sacar la contraseña
+            string GetIntelisisConnection(IServiceProvider provider)
             {
                 var secure = provider.GetRequiredService<SecureStorageService>();
                 var settings = WPF_PAR.Properties.Settings.Default;
                 string pass = secure.RecuperarPassword(SecureStorageService.KeyData) ?? "";
+                return $"Data Source={settings.Data_Server};Initial Catalog={settings.Data_Db};User ID={settings.Data_User};Password={pass};TrustServerCertificate=True;Timeout=60";
+            }
 
-                string connectionString = $"Data Source={settings.Data_Server};Initial Catalog={settings.Data_Db};User ID={settings.Data_User};Password={pass};TrustServerCertificate=True";
-
-                return new SucursalesService(connectionString);
-            });
-
-            // C) AUTH SERVICE (Connects to PAR_System_DB)
-            services.AddTransient<AuthService>(provider =>
+            string GetParSystemConnection(IServiceProvider provider)
             {
                 var secure = provider.GetRequiredService<SecureStorageService>();
                 var settings = WPF_PAR.Properties.Settings.Default;
                 string pass = secure.RecuperarPassword(SecureStorageService.KeyData) ?? "";
+                // Apunta a la BD Intermedia
+                return $"Data Source={settings.Data_Server};Initial Catalog=PAR_System_DB;User ID={settings.Data_User};Password={pass};TrustServerCertificate=True";
+            }
 
-                // NOTE: Assuming PAR_System_DB is on the same server as DataServer
-                // If it were separate, you would use settings.AuthServer
-                string connectionString = $"Data Source={settings.Data_Server};Initial Catalog=PAR_System_DB;User ID={settings.Data_User};Password={pass};TrustServerCertificate=True";
+            // A) Servicios que leen del ERP (Intelisis)
+            services.AddTransient<ReportesService>(provider => new ReportesService(GetIntelisisConnection(provider)));
+            services.AddTransient<SucursalesService>(provider => new SucursalesService(GetIntelisisConnection(provider)));
+            services.AddTransient<ClientesService>(provider => new ClientesService(GetIntelisisConnection(provider)));
+            services.AddSingleton<FilterService>(provider => new FilterService(GetIntelisisConnection(provider)));
 
-                return new AuthService(connectionString);
-            });
+            // B) Servicios que leen/escriben de tu BD Local/Intermedia (ParSystem)
+            services.AddTransient<AuthService>(provider => new AuthService(GetParSystemConnection(provider)));
+            services.AddTransient<CacheService>(provider => new CacheService(GetParSystemConnection(provider)));
 
             // =========================================================================
-            // 3. LOGIC SERVICES (Pure Logic from Core)
+            // 3. LOGIC SERVICES (Pure Logic from Core - No SQL needed)
             // =========================================================================
-            // These don't need a factory because they don't use SQL directly or their dependencies are auto-resolved
             services.AddTransient<FamiliaLogicService>();
             services.AddTransient<ClientesLogicService>();
             services.AddTransient<ChartService>();
-            services.AddTransient<ClientesService>();
             services.AddTransient<CatalogoService>();
             services.AddTransient<ExportService>();
 
@@ -106,28 +88,23 @@ namespace WPF_PAR
 
             services.AddTransient<MainWindow>();
             services.AddTransient<LoginWindow>();
-            services.AddTransient<SettingsView>(); // If you use it as a window or direct view
+            services.AddTransient<SettingsView>();
 
             return services.BuildServiceProvider();
         }
+
         protected override void OnStartup(StartupEventArgs e)
-        {   
+        {
             if ( WPF_PAR.Properties.Settings.Default.UpgradeRequired )
             {
                 try
                 {
-                    // 1. Busca la configuración de la versión anterior y la importa
                     WPF_PAR.Properties.Settings.Default.Upgrade();
-
-                    // 2. Apagamos la bandera para que no lo haga cada vez que abres la app
                     WPF_PAR.Properties.Settings.Default.UpgradeRequired = false;
-
-                    // 3. Guardamos los cambios en la NUEVA carpeta de versión
                     WPF_PAR.Properties.Settings.Default.Save();
                 }
                 catch ( Exception ex )
                 {
-                    // Si falla (muy raro), al menos no crasheamos, pero tocará reconfigurar
                     System.Diagnostics.Debug.WriteLine("Error migrando settings: " + ex.Message);
                 }
             }
@@ -157,7 +134,6 @@ namespace WPF_PAR
             }
         }
 
-        // Modificamos el método para aceptar un parámetro opcional
         public void AbrirMainWindow(bool modoConfiguracion = false)
         {
             var mainWindow = Services.GetRequiredService<MainWindow>();
@@ -165,28 +141,19 @@ namespace WPF_PAR
 
             if ( modoConfiguracion )
             {
-                // Forzamos la vista de Settings
                 mainViewModel.CurrentView = Services.GetRequiredService<SettingsViewModel>();
-
-                // Mensaje de bienvenida
                 mainViewModel.MessageQueue.Enqueue("Bienvenido. Configura la conexión al servidor para continuar.");
             }
             else
             {
-                // Flujo normal (viene del Login)
-                // 1. Obtenemos el DashboardViewModel
                 var dashboardVM = Services.GetRequiredService<DashboardViewModel>();
-
-                // 2. Lo asignamos como vista actual
                 mainViewModel.CurrentView = dashboardVM;
-
                 dashboardVM.CargarDatosIniciales();
             }
 
             mainWindow.DataContext = mainViewModel;
             mainWindow.Show();
 
-            // Asegurarnos de cerrar la ventana de Login si estaba abierta
             var loginWindow = Application.Current.Windows.OfType<LoginWindow>().FirstOrDefault();
             if ( loginWindow != null )
             {
