@@ -18,29 +18,21 @@ namespace WPF_PAR.Core.Services
             _businessLogic = businessLogic;
         }
 
-        // --------------------------------------------------------------------
-        // 1. Resumen Global (Tarjetas Superiores)
-        // --------------------------------------------------------------------
-        // 1. Lógica para generar las tarjetas de resumen (Arquitectónica/Especializada)
         public (List<FamiliaResumenModel> Arqui, List<FamiliaResumenModel> Espe) CalcularResumenGlobal(List<VentaReporteModel> ventas)
         {
             var arq = new List<FamiliaResumenModel>();
             var esp = new List<FamiliaResumenModel>();
 
-            // 1. CALCULAR GRAN TOTAL (Vital para sacar los porcentajes)
             decimal granTotal = ventas?.Sum(x => x.TotalVenta) ?? 1;
-            if ( granTotal == 0 ) granTotal = 1; // Protección contra división por cero
+            if ( granTotal == 0 ) granTotal = 1;
 
             var grupos = ventas?.GroupBy(x => x.Familia).ToList() ?? new List<IGrouping<string, VentaReporteModel>>();
 
-            // Procesar Arquitectónica
             foreach ( var nombre in ConfiguracionLineas.Arquitectonica )
             {
-                // Pasamos 'granTotal' al método CrearTarjeta
                 arq.Add(CrearTarjeta(nombre, grupos, granTotal));
             }
 
-            // Procesar Especializada
             foreach ( var nombre in ConfiguracionLineas.Especializada )
             {
                 esp.Add(CrearTarjeta(nombre, grupos, granTotal));
@@ -60,27 +52,22 @@ namespace WPF_PAR.Core.Services
                 ColorFondo = color,
                 ColorTexto = ColorHelper.ObtenerColorTextoLegible(color),
                 VentaTotal = 0,
-                LitrosTotal = 0, // <--- OJO: Singular, como en el Modelo
-                PorcentajeParticipacion = 0, // <--- Inicializamos en 0
+                LitrosTotal = 0,
+                PorcentajeParticipacion = 0,
                 ProductoEstrella = "---"
             };
 
             if ( grupo != null )
             {
-                // 1. Sumas básicas
                 modelo.VentaTotal = grupo.Sum(x => x.TotalVenta);
 
-                // 2. CORRECCIÓN LITROS: Usamos la propiedad correcta del Modelo (Singular)
-                // Asegúrate de que x.LitrosTotales (del reporte SQL) sea double o castéalo
                 modelo.LitrosTotal = ( double ) grupo.Sum(x => x.LitrosTotales);
 
-                // 3. CÁLCULO DE PORCENTAJE (Nueva lógica)
                 if ( granTotalGlobal > 0 )
                 {
                     modelo.PorcentajeParticipacion = ( double ) ( modelo.VentaTotal / granTotalGlobal );
                 }
 
-                // 4. Producto Estrella
                 var top = grupo.GroupBy(g => g.Descripcion)
                                .OrderByDescending(x => x.Sum(v => v.LitrosTotales))
                                .FirstOrDefault();
@@ -95,7 +82,6 @@ namespace WPF_PAR.Core.Services
             var resultado = new List<SubLineaPerformanceModel>();
             if ( ventas == null || !ventas.Any() ) return resultado;
 
-            // Agrupamos por la propiedad LINEA (Ej: Impermeabilizantes -> Acrilicos, Asfalticos...)
             var grupos = ventas.GroupBy(x => x.Linea ?? "Otros");
 
             int mesActual = DateTime.Now.Month;
@@ -110,13 +96,12 @@ namespace WPF_PAR.Core.Services
                     Bloques = new List<PeriodoBloque>()
                 };
 
-                // Generar los bloques según el periodo solicitado
                 if ( periodo == "SEMESTRAL" )
                 {
                     item.Bloques.Add(CrearBloque("S1", grupo.ToList(), 1, 6, mesActual));
                     item.Bloques.Add(CrearBloque("S2", grupo.ToList(), 7, 12, mesActual));
                 }
-                else // TRIMESTRAL (Default)
+                else 
                 {
                     item.Bloques.Add(CrearBloque("Q1", grupo.ToList(), 1, 3, mesActual));
                     item.Bloques.Add(CrearBloque("Q2", grupo.ToList(), 4, 6, mesActual));
@@ -127,18 +112,14 @@ namespace WPF_PAR.Core.Services
                 resultado.Add(item);
             }
 
-            // Ordenamos por venta total descendente
             return resultado.OrderByDescending(x => x.VentaTotal).ToList();
         }
         private PeriodoBloque CrearBloque(string etiqueta, List<VentaReporteModel> ventas, int mesInicio, int mesFin, int mesActual)
         {
-            // Filtramos las ventas que caen en este rango de meses
             var ventasPeriodo = ventas
                 .Where(x => x.FechaEmision.Month >= mesInicio && x.FechaEmision.Month <= mesFin)
                 .ToList();
 
-            // Determinamos si es un periodo futuro para pintarlo gris en la UI
-            // (Si el inicio del bloque es mayor al mes actual)
             bool esFuturo = mesInicio > mesActual;
 
             return new PeriodoBloque
@@ -150,9 +131,6 @@ namespace WPF_PAR.Core.Services
             };
         }
 
-        // --------------------------------------------------------------------
-        // 3. Utilidades (Ordenamiento, CSV, Vacíos)
-        // --------------------------------------------------------------------
         public List<FamiliaResumenModel> OrdenarTarjetas(IEnumerable<FamiliaResumenModel> lista, string criterio)
         {
             if ( lista == null ) return new List<FamiliaResumenModel>();
@@ -165,17 +143,15 @@ namespace WPF_PAR.Core.Services
         {
             var sb = new StringBuilder();
 
-            // 1. ENCABEZADOS: Agrega 'Movimiento' y 'Folio' aunque no se vean en la app
             sb.AppendLine("Fecha,Sucursal,Movimiento,Folio,Cliente,Articulo,Cantidad,Precio Unitario,Total Venta");
 
             foreach ( var v in ventas )
             {
-                // 2. FILAS: Aquí es donde vuelcas la data oculta al Excel
                 sb.AppendLine(string.Format("{0:dd/MM/yyyy},{1},{2},{3},{4},{5},{6},{7},{8}",
                     v.FechaEmision,
                     v.Sucursal,
-                    v.Mov,           // <--- EL DATO OCULTO 1 (Factura/Devolucion)
-                    v.MovID,         // <--- EL DATO OCULTO 2 (Folio)
+                    v.Mov,
+                    v.MovID,
                     Sanitize(v.Cliente),
                     Sanitize(v.Descripcion ?? v.Articulo),
                     v.Cantidad,

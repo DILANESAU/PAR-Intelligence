@@ -1,13 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 
 using WPF_PAR.Core.Models;
 using WPF_PAR.Core.Services;
-
-using static WPF_PAR.Core.Services.SqlHelper;
 
 namespace WPF_PAR.Services
 {
@@ -15,57 +12,39 @@ namespace WPF_PAR.Services
     {
         private readonly SqlHelper _authSqlHelper;
 
-        public AuthService()
+        // Constructor que recibe la cadena de conexión
+        public AuthService(string connectionString)
         {
-            // CAMBIO CRUCIAL:
-            // Antes: new SqlHelper("AuthConnection");
-            // Ahora: Le decimos explícitamente "Conéctate al servidor de AUTH"
-            _authSqlHelper = new SqlHelper(TipoConexion.Auth);
+            _authSqlHelper = new SqlHelper(connectionString);
         }
 
         public async Task<UsuarioModel> ValidarLoginAsync(string usuarioInput, string passwordInput)
         {
-            UsuarioModel usuarioEncontrado = null;
-
-            // ... (El resto de tu lógica SQL se queda IGUAL, está perfecta) ...
-
+            // 1. Buscamos al usuario
+            // Usamos AS Username para que Dapper lo mapee automático a la propiedad Username
             string query = @"
                 SELECT 
                     IdUsuario,
-                    [user],
+                    [user] AS Username, 
                     NombreCompleto, 
                     Correo,
                     Rol
                 FROM Usuarios 
                 WHERE [user] = @User AND Clave = @Pass";
 
-            var parametros = new Dictionary<string, object>
-            {
-                { "@User", usuarioInput },
-                { "@Pass", passwordInput }
-            };
+            var parametros = new { User = usuarioInput, Pass = passwordInput };
 
-            var listaUsuarios = await _authSqlHelper.QueryAsync(query, parametros, lector =>
-            {
-                return new UsuarioModel
-                {
-                    IdUsuario = Convert.ToInt32(lector["IdUsuario"]),
-                    Username = lector["user"].ToString(),
-                    NombreCompleto = lector["NombreCompleto"].ToString(),
-                    Rol = lector["Rol"].ToString(),
-                    Password = "",
-                    SucursalesPermitidas = null
-                };
-            });
-
-            usuarioEncontrado = listaUsuarios.FirstOrDefault();
+            // QueryAsync<T> hace el mapeo por nosotros
+            var usuarios = await _authSqlHelper.QueryAsync<UsuarioModel>(query, parametros);
+            var usuarioEncontrado = usuarios.FirstOrDefault();
 
             if ( usuarioEncontrado == null ) return null;
 
-            // Lógica de Permisos (Se queda igual)
-            if ( usuarioEncontrado.Rol.Equals("Admin", StringComparison.OrdinalIgnoreCase) )
+            // 2. Lógica de Permisos
+            if ( usuarioEncontrado.Rol.Equals("Admin", StringComparison.OrdinalIgnoreCase) ||
+                usuarioEncontrado.Rol.Equals("Director", StringComparison.OrdinalIgnoreCase) )
             {
-                usuarioEncontrado.SucursalesPermitidas = null; // null significa "Todas"
+                usuarioEncontrado.SucursalesPermitidas = null; // Acceso total
             }
             else
             {
@@ -74,21 +53,14 @@ namespace WPF_PAR.Services
                     FROM UsuarioSucursales
                     WHERE IdUsuario = @Id";
 
-                var paramsPermisos = new Dictionary<string, object> { { "@Id", usuarioEncontrado.IdUsuario } };
+                var paramsPermisos = new { Id = usuarioEncontrado.IdUsuario };
 
-                var listaIds = await _authSqlHelper.QueryAsync(queryPermisos, paramsPermisos, lector =>
-                {
-                    return Convert.ToInt32(lector["IdSucursal"]);
-                });
+                // Traemos la lista de IDs directamente como una lista de int
+                var listaIds = await _authSqlHelper.QueryAsync<int>(queryPermisos, paramsPermisos);
 
-                if ( listaIds.Count > 0 )
-                {
-                    usuarioEncontrado.SucursalesPermitidas = listaIds;
-                }
-                else
-                {
-                    usuarioEncontrado.SucursalesPermitidas = new List<int>();
-                }
+                usuarioEncontrado.SucursalesPermitidas = listaIds.Any()
+                    ? listaIds
+                    : new List<int>();
             }
 
             return usuarioEncontrado;

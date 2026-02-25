@@ -1,11 +1,7 @@
-﻿using WPF_PAR.Core.Services;
-using WPF_PAR.Core.Models; // Asegúrate de tener un modelo para esto
+﻿using WPF_PAR.Core.Models;
 
-using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-
-using Microsoft.Data.SqlClient;
 
 namespace WPF_PAR.Core.Services
 {
@@ -24,27 +20,21 @@ namespace WPF_PAR.Core.Services
                 SELECT 
                     Articulo, 
                     SUM(VentaTotal) as TotalVenta, 
-                    SUM(Cantidad) as Cantidad 
+                    SUM(Cantidad) as LitrosTotal  -- <--- Renombrado para coincidir con tu Modelo
                 FROM Venta 
                 WHERE Sucursal = @Sucursal 
                   AND FechaEmision BETWEEN @Inicio AND @Fin
                   AND Estatus = 'CONCLUIDO'
                 GROUP BY Articulo";
 
-            var parametros = new Dictionary<string, object>
+            var parametros = new
             {
-                { "@Sucursal", idSucursal },
-                { "@Inicio", inicio },
-                { "@Fin", fin }
+                Sucursal = idSucursal,
+                Inicio = inicio,
+                Fin = fin
             };
 
-            // Mapeamos el resultado a tu modelo
-            return await _sqlHelper.QueryAsync(query, parametros, reader => new VentaReporteModel
-            {
-                Articulo = reader["Articulo"].ToString(),
-                TotalVenta = Convert.ToDecimal(reader["TotalVenta"]),
-                LitrosTotal = Convert.ToDouble(reader["Cantidad"])
-            });
+            return await _sqlHelper.QueryAsync<VentaReporteModel>(query, parametros);
         }
     }
 }

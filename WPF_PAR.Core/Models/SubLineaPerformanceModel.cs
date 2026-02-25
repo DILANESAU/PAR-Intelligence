@@ -6,10 +6,10 @@ namespace WPF_PAR.Core.Models
 {
     public class PeriodoBloque
     {
-        public string Etiqueta { get; set; } // "Q1", "Sem 1"
-        public decimal Valor { get; set; }   // $50,000
-        public double Litros { get; set; }   // 10,000 L
-        public bool EsFuturo { get; set; }   // Para pintar de gris lo que aun no pasa
+        public string Etiqueta { get; set; }
+        public decimal Valor { get; set; }
+        public double Litros { get; set; }
+        public bool EsFuturo { get; set; }
     }
     public class SubLineaPerformanceModel
     {

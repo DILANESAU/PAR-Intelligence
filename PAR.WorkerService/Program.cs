@@ -1,24 +1,16 @@
 using PAR.WorkerService;
 
-using WPF_PAR.Core.Services;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
+// Configuración del Host para el Worker Service
 IHost host = Host.CreateDefaultBuilder(args)
-    .ConfigureServices((hostContext, services) =>
+    .ConfigureServices(services =>
     {
-        IConfiguration configuration = hostContext.Configuration;
-        string connIntelisis = configuration.GetConnectionString("Intelisis");
-        string connPAR = configuration.GetConnectionString("ParSystemConnection");
-        services.AddSingleton<ReportesService>(sp => new ReportesService(connIntelisis));
-        services.AddSingleton<ClientesService>(sp => new ClientesService(connIntelisis));
-        services.AddSingleton<CacheService>(sp => new CacheService(connPar));
-
+        // Solo registramos el Worker. 
+        // Él se encargará de leer el appsettings.json y crear sus servicios internamente.
         services.AddHostedService<Worker>();
     })
     .Build();
-/*
-var builder = Host.CreateApplicationBuilder(args);
-builder.Services.AddHostedService<Worker>();
 
-var host = builder.Build();
-host.Run();
-*/
+await host.RunAsync();

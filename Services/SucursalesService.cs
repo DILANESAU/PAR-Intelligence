@@ -2,13 +2,23 @@
 using System.Collections.Generic;
 using System.Linq;
 
-namespace WPF_PAR.Services
+namespace WPF_PAR.Core.Services // <--- Unificamos en el Core
 {
     public class SucursalesService
     {
+        // Agregamos el campo de conexión por si en el futuro quieres 
+        // cargar las sucursales desde SQL en lugar de escribirlas a mano.
+        private readonly string _connectionString;
+
+        // ESTE ES EL CONSTRUCTOR QUE FALTABA
+        public SucursalesService(string connectionString)
+        {
+            _connectionString = connectionString;
+        }
+
         public Dictionary<int, string> CargarSucursales()
         {
-            // DATOS INCRUSTADOS: Ya no dependemos de archivos externos
+            // DATOS INCRUSTADOS: (Tu lista original)
             var datos = new Dictionary<int, string>
             {
                 { 1210, "PAR Cuauhtemoc Veracruz" },

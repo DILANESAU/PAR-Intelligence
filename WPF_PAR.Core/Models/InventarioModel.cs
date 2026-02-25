@@ -10,26 +10,20 @@ namespace WPF_PAR.Core.Models
         public string Producto { get; set; }
         public string Unidad { get; set; }
 
-        // Datos Numéricos Base (Unidades)
         public double Existencia { get; set; }
         public double MinimoUnidades { get; set; }
         public double MaximoUnidades { get; set; }
 
-        // Conversión a Litros
         public double FactorLitros { get; set; }
 
-        // Propiedades Calculadas en Litros
         public double TotalLitros => Existencia * FactorLitros;
         public double MinimoLitros => MinimoUnidades * FactorLitros;
         public double MaximoLitros => MaximoUnidades * FactorLitros;
 
-        // LÓGICA DE SEMÁFORO (KPI)
-        // Retorna: "BAJO", "OK", "EXCESO"
         public string Situacion
         {
             get
             {
-                // Si no es pintura (no tiene litros) o no tiene configurados máximos, ignoramos
                 if ( FactorLitros <= 0 || MaximoUnidades == 0 ) return "NORMAL";
 
                 if ( TotalLitros < MinimoLitros ) return "BAJO";
@@ -38,16 +32,15 @@ namespace WPF_PAR.Core.Models
             }
         }
 
-        // Propiedades visuales para la tabla
         public string ColorEstado
         {
             get
             {
                 switch ( Situacion )
                 {
-                    case "BAJO": return "#F44336";   // Rojo (Poco stock)
-                    case "EXCESO": return "#FFC107"; // Ámbar (Mucho stock)
-                    case "OPTIMO": return "#4CAF50"; // Verde (Bien)
+                    case "BAJO": return "#F44336";
+                    case "EXCESO": return "#FFC107";
+                    case "OPTIMO": return "#4CAF50";
                     default: return "Transparent";
                 }
             }

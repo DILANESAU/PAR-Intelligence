@@ -2,7 +2,7 @@
 
 using System;
 using System.Threading.Tasks;
-using System.Windows;
+using System.Windows; // Para Application.Current
 using System.Windows.Controls;
 using System.Windows.Media;
 
@@ -14,19 +14,38 @@ namespace WPF_PAR.Services
     public class NotificationService : INotificationService
     {
         public SnackbarMessageQueue MessageQueue { get; }
+        private readonly IDialogService _dialogService;
 
+        // 1. CONSTRUCTOR VACÍO (Compatibilidad con ClientesViewModel)
+        // Si no le pasamos nada, él crea su propio DialogService.
+        public NotificationService() : this(new DialogService())
+        {
+        }
+
+        // 2. CONSTRUCTOR CON INYECCIÓN (El ideal)
         public NotificationService(IDialogService dialogService)
         {
+            _dialogService = dialogService;
+            // Configuración del tiempo del Snackbar (3 segundos)
             MessageQueue = new SnackbarMessageQueue(TimeSpan.FromSeconds(3));
         }
 
-        // --- MÉTODO PRIVADO PARA ENVIAR CON SEGURIDAD ---
+        // --- MÉTODO PRIVADO PARA ENVIAR CON SEGURIDAD (HILO UI) ---
         private void EnqueueSafely(NotificationAlert alerta)
         {
-            // Esto asegura que SIEMPRE se ejecute en el hilo principal (UI)
+            if ( Application.Current == null ) return;
+
             Application.Current.Dispatcher.Invoke(() =>
             {
+                // Aquí encolamos el OBJETO alerta. 
+                // Asegúrate de que en tu XAML del MainWindow el Snackbar MessageTemplate 
+                // sepa cómo mostrar un objeto 'NotificationAlert', o si no, pásale solo el string.
+
+                // Opción A: Si tu XAML soporta el objeto complejo:
                 MessageQueue.Enqueue(alerta);
+
+                // Opción B (Más segura si no tienes DataTemplates complejos):
+                // MessageQueue.Enqueue(alerta.Message, "OK", () => { });
             });
         }
 
@@ -38,7 +57,7 @@ namespace WPF_PAR.Services
                 Message = message,
                 Type = AlertType.Success
             };
-            EnqueueSafely(alerta); // Usamos el método seguro
+            EnqueueSafely(alerta);
         }
 
         public void ShowError(string message)
@@ -49,10 +68,6 @@ namespace WPF_PAR.Services
                 Message = message,
                 Type = AlertType.Error
             };
-
-            // Los errores a veces necesitan duración personalizada, 
-            // pero para simplificar, usaremos la cola estándar con el objeto.
-            // Si quieres duración extra, tendrías que ajustar el objeto o la cola.
             EnqueueSafely(alerta);
         }
 
@@ -67,15 +82,18 @@ namespace WPF_PAR.Services
             EnqueueSafely(alerta);
         }
 
-        // ... El resto de tu código (ShowErrorDialog) está bien ...
         public async Task ShowErrorDialog(string message)
         {
-            // ... tu código existente ...
-            // Solo asegúrate de envolver el DialogHost.Show en Dispatcher si te da problemas
             await Application.Current.Dispatcher.InvokeAsync(async () =>
             {
-                // Tu lógica de creación de vista y DialogHost.Show aquí
-                // ...
+                // Usamos el servicio de diálogo que inyectamos o creamos
+                if ( _dialogService != null )
+                {
+                    // Asumiendo que tu DialogService tiene un método ShowMessage o similar
+                    // Si tu interfaz IDialogService tiene ShowError, úsalo.
+                    // Aquí llamamos a un método genérico de mensaje como ejemplo:
+                    _dialogService.ShowMessage("Error Crítico", message);
+                }
             });
         }
     }

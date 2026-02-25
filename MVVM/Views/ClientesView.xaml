@@ -16,7 +16,7 @@
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis"/>
         <converters:BoolToColorConverter x:Key="BoolToColorConverter"/>
-        <core:BindingProxy x:Key="MyProxy" Data="{Binding}" />
+        <converters:BindingProxy x:Key="MyProxy" Data="{Binding}" />
     </UserControl.Resources>
 
     <Grid Margin="20">

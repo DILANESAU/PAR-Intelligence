@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq; // Necesario para LINQ
+using System.Linq;
 using System.Text;
 
+// Agregamos el Core para encontrar SucursalesService
+using WPF_PAR.Core.Services;
 using WPF_PAR.Converters;
 
 namespace WPF_PAR.Services
@@ -11,7 +13,6 @@ namespace WPF_PAR.Services
     {
         // --- EVENTO FALTANTE ---
         public event Action OnFiltrosCambiados;
-        // -----------------------
 
         private int _sucursalId;
         public int SucursalId
@@ -23,13 +24,11 @@ namespace WPF_PAR.Services
                 {
                     _sucursalId = value;
                     OnPropertyChanged();
-                    // INVOCAR EL EVENTO AL CAMBIAR
+                    // Invocar evento al cambiar
                     OnFiltrosCambiados?.Invoke();
                 }
             }
         }
-
-        // ... (Tus propiedades de fecha, agregando OnFiltrosCambiados?.Invoke() en los setters si quieres que refresquen también)
 
         private DateTime _fechaInicio;
         public DateTime FechaInicio
@@ -41,7 +40,7 @@ namespace WPF_PAR.Services
                 {
                     _fechaInicio = value;
                     OnPropertyChanged();
-                    // Opcional: OnFiltrosCambiados?.Invoke(); 
+                    OnFiltrosCambiados?.Invoke();
                 }
             }
         }
@@ -56,7 +55,7 @@ namespace WPF_PAR.Services
                 {
                     _fechaFin = value;
                     OnPropertyChanged();
-                    // Opcional: OnFiltrosCambiados?.Invoke(); 
+                    OnFiltrosCambiados?.Invoke();
                 }
             }
         }
@@ -68,12 +67,16 @@ namespace WPF_PAR.Services
             set { _listaSucursales = value; OnPropertyChanged(); }
         }
 
-        public FilterService(SucursalesService sucursalesService)
+        // CAMBIO IMPORTANTE: Constructor recibe string para ser autónomo
+        public FilterService(string connectionString)
         {
-            // (Tu lógica de constructor estaba bien, se mantiene igual)
+            // 1. Instanciamos el servicio aquí mismo
+            var sucursalesService = new SucursalesService(connectionString);
+
+            // 2. Cargamos las sucursales
             var todas = sucursalesService.CargarSucursales();
 
-            // ... resto de tu lógica de permisos ...
+            // 3. Lógica de permisos (Usando Session)
             if ( Session.UsuarioActual?.SucursalesPermitidas == null )
             {
                 ListaSucursales = todas;
@@ -85,12 +88,12 @@ namespace WPF_PAR.Services
                     .ToDictionary(k => k.Key, v => v.Value);
             }
 
-            // ... fechas y default ...
+            // 4. Fechas por defecto
             DateTime hoy = DateTime.Now;
             FechaInicio = new DateTime(hoy.Year, hoy.Month, 1);
             FechaFin = hoy;
 
-            // Inicialización segura de SucursalId
+            // 5. Inicialización de SucursalId por defecto
             if ( Properties.Settings.Default.SucursalDefaultId != 0 && ListaSucursales.ContainsKey(Properties.Settings.Default.SucursalDefaultId) )
                 SucursalId = Properties.Settings.Default.SucursalDefaultId;
             else if ( ListaSucursales.Count > 0 )

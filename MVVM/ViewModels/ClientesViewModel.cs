@@ -11,13 +11,15 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
-using System.Windows.Media;
 
-using WPF_PAR.Converters;
+// 1. Apuntamos al Core para Modelos y Servicios de Datos
 using WPF_PAR.Core.Models;
 using WPF_PAR.Core.Services;
+
+// 2. Apuntamos a los servicios propios de la UI (Dialogos, Notificaciones)
 using WPF_PAR.Services;
 using WPF_PAR.Services.Interfaces;
+using WPF_PAR.Converters; // Si usas ObservableObject desde aquí
 
 namespace WPF_PAR.MVVM.ViewModels
 {
@@ -26,11 +28,15 @@ namespace WPF_PAR.MVVM.ViewModels
         // --- SERVICIOS ---
         private readonly ReportesService _reportesService;
         private readonly ClientesLogicService _logicService;
-        private readonly IDialogService _dialogService;
-        private readonly INotificationService _notificationService;
         private readonly CatalogoService _catalogoService;
         private readonly SucursalesService _sucursalesService;
+
+        // Servicios de UI (Interfaces)
+        private readonly IDialogService _dialogService;
+        private readonly INotificationService _notificationService;
+
         public FilterService Filters { get; }
+
         private bool _isInitialized = false;
 
         // --- FILTROS ---
@@ -48,12 +54,9 @@ namespace WPF_PAR.MVVM.ViewModels
                     _sucursalSeleccionada = value;
                     OnPropertyChanged();
 
-                    // Cuando cambia la sucursal, actualizamos el Filtro Global y recargamos
                     if ( value != null )
                     {
                         Filters.SucursalId = value.Id;
-
-                        // Solo recargamos si ya estábamos inicializados
                         if ( _isInitialized )
                         {
                             CargarDatosIniciales();
@@ -74,7 +77,7 @@ namespace WPF_PAR.MVVM.ViewModels
                 {
                     _anioSeleccionado = value;
                     OnPropertyChanged();
-                    CargarDatosIniciales(); // Recargar al cambiar año
+                    CargarDatosIniciales();
                 }
             }
         }
@@ -91,16 +94,15 @@ namespace WPF_PAR.MVVM.ViewModels
                 CalcularVisibilidadPeriodos();
                 ActualizarGrafica();
 
-                // ¡NUEVO! Recargar productos al cambiar modo
                 if ( ClienteSeleccionado != null )
                 {
-                    _ = CargarProductosDinamicos(); // Llamada asíncrona fire-and-forget segura en setter
+                    _ = CargarProductosDinamicos();
                 }
             }
         }
 
         // --- DATOS PRINCIPALES ---
-        private List<ClienteResumenModel> _todosLosClientes; // Copia maestra para búsqueda local
+        private List<ClienteResumenModel> _todosLosClientes;
         private ObservableCollection<ClienteResumenModel> _clientesResumen;
         public ObservableCollection<ClienteResumenModel> ClientesResumen
         {
@@ -108,7 +110,7 @@ namespace WPF_PAR.MVVM.ViewModels
             set { _clientesResumen = value; OnPropertyChanged(); }
         }
 
-        // --- CLIENTE SELECCIONADO (DETALLE) ---
+        // --- CLIENTE SELECCIONADO ---
         private ClienteResumenModel _clienteSeleccionado;
         public ClienteResumenModel ClienteSeleccionado
         {
@@ -119,13 +121,12 @@ namespace WPF_PAR.MVVM.ViewModels
                 OnPropertyChanged();
                 if ( value != null )
                 {
-                    CargarDetalleAdicional(value); // Cargar KPIs SQL
-                    ActualizarGrafica();           // Dibujar gráfica
+                    CargarDetalleAdicional(value);
+                    ActualizarGrafica();
                 }
             }
         }
 
-        // --- DATOS DEL DETALLE ---
         private KpiClienteModel _kpisDetalle;
         public KpiClienteModel KpisDetalle
         {
@@ -177,14 +178,14 @@ namespace WPF_PAR.MVVM.ViewModels
             set { _textoBusqueda = value; OnPropertyChanged(); FiltrarTabla(); }
         }
 
-        // --- KPIs GLOBALES (Cabecera) ---
+        // --- KPIs GLOBALES ---
         private int _totalClientesActivos;
         public int TotalClientesActivos { get => _totalClientesActivos; set { _totalClientesActivos = value; OnPropertyChanged(); } }
 
         private int _totalClientesInactivos;
         public int TotalClientesInactivos { get => _totalClientesInactivos; set { _totalClientesInactivos = value; OnPropertyChanged(); } }
 
-        // --- VISIBILIDAD DE COLUMNAS ---
+        // --- VISIBILIDAD ---
         public Visibility VisibilityQ1 { get; set; } = Visibility.Collapsed;
         public Visibility VisibilityQ2 { get; set; } = Visibility.Collapsed;
         public Visibility VisibilityQ3 { get; set; } = Visibility.Collapsed;
@@ -199,24 +200,33 @@ namespace WPF_PAR.MVVM.ViewModels
         public RelayCommand ImprimirReporteCommand { get; set; }
 
         // =============================================================================
-        // CONSTRUCTOR
+        // CONSTRUCTOR ACTUALIZADO (Recibe string, crea servicios)
         // =============================================================================
-        public ClientesViewModel(ReportesService reportesService, FilterService filterService, IDialogService dialogService, INotificationService notificationService, BusinessLogicService businessLogic, SucursalesService sucursalesService)
+        public ClientesViewModel(string connectionString)
         {
-            _reportesService = reportesService;
-            Filters = filterService;
-            _dialogService = dialogService;
-            _notificationService = notificationService;
-            _logicService = new ClientesLogicService();
-            _catalogoService = new CatalogoService(businessLogic);
-            _sucursalesService = sucursalesService; // Asignado correctamente
+            // 1. Inicializamos Servicios de DATOS (Usando la conexión)
+            // NOTA: Asegúrate de que SucursalesService tenga un constructor que acepte string, 
+            // igual que hicimos con ReportesService.
+            _reportesService = new ReportesService(connectionString);
+            _sucursalesService = new SucursalesService(connectionString);
 
-            // Inicializar años
+            // 2. Inicializamos Lógica de Negocio (Sin conexión directa usualmente)
+            _logicService = new ClientesLogicService();
+            var businessLogic = new BusinessLogicService(); // Asumiendo que es ligero
+            _catalogoService = new CatalogoService(businessLogic);
+
+            // 3. Inicializamos Servicios de UI
+            // Asumimos que estas clases existen en tu proyecto WPF (Services/DialogService.cs)
+            _dialogService = new DialogService();
+            _notificationService = new NotificationService();
+            Filters = new FilterService(connectionString);
+
+            // 4. Configuración inicial
             int year = DateTime.Now.Year;
             AñosDisponibles = new ObservableCollection<int> { year, year - 1, year - 2, year - 3 };
             _anioSeleccionado = year;
 
-            // Comandos
+            // 5. Configurar Comandos
             ActualizarCommand = new RelayCommand(o => CargarDatosIniciales());
             ImprimirReporteCommand = new RelayCommand(o => GenerarPdfCliente());
 
@@ -237,34 +247,32 @@ namespace WPF_PAR.MVVM.ViewModels
 
             Filters.OnFiltrosCambiados += CargarDatosIniciales;
         }
+
         // =============================================================================
-        // MÉTODOS DE CARGA DE DATOS
+        // MÉTODOS (Ligeramente ajustados para tareas asíncronas)
         // =============================================================================
+
         public async void CargarDatosIniciales()
         {
-            // 1. GARANTÍA DE FILTROS: Si no hay sucursales, las cargamos de inmediato
             if ( Sucursales.Count == 0 )
             {
                 Sucursales.Clear();
-                // Opción segura para que el ComboBox no nazca vacío
                 Sucursales.Add(new SucursalModel { Id = 0, Nombre = "0 - TODAS" });
 
-                var dic = _sucursalesService.CargarSucursales();
+                // NOTA: Verifica que tu SucursalesService devuelva el diccionario correctamente
+                var dic = await Task.Run(() => _sucursalesService.CargarSucursales());
+
                 if ( dic != null )
                 {
                     foreach ( var kvp in dic )
                         Sucursales.Add(new SucursalModel { Id = kvp.Key, Nombre = $"{kvp.Key} - {kvp.Value}" });
                 }
 
-                // Selección del default guardado
                 int idGuardado = Properties.Settings.Default.SucursalDefaultId;
                 var encontrada = Sucursales.FirstOrDefault(s => s.Id == idGuardado);
-
-                // El setter de SucursalSeleccionada actualizará Filters.SucursalId
                 SucursalSeleccionada = encontrada ?? Sucursales.First();
             }
 
-            // 2. CARGA DE DATOS (SQL): Ahora que los filtros son seguros, traemos los datos
             IsLoading = true;
             try
             {
@@ -277,6 +285,7 @@ namespace WPF_PAR.MVVM.ViewModels
 
                 await Task.WhenAll(taskActual, taskAnterior);
 
+                // Procesamiento pesado en hilo secundario
                 _todosLosClientes = await Task.Run(() => _logicService.ProcesarClientes(taskActual.Result, taskAnterior.Result));
 
                 TotalClientesActivos = _todosLosClientes.Count(x => x.VentaAnualActual > 0);
@@ -298,12 +307,10 @@ namespace WPF_PAR.MVVM.ViewModels
                 IsLoading = false;
             }
         }
+
         private async Task CargarProductosDinamicos()
         {
             if ( ClienteSeleccionado == null ) return;
-
-            // No ponemos IsLoading global aquí para no bloquear toda la UI al cambiar pestañitas, 
-            // pero podrías poner una banderita local si quieres.
 
             try
             {
@@ -315,7 +322,6 @@ namespace WPF_PAR.MVVM.ViewModels
                     fin,
                     Filters.SucursalId);
 
-                // Procesar Tops
                 var declive = todosProductos.Where(x => x.Diferencia < 0).OrderBy(x => x.Diferencia).Take(10).ToList();
                 var aumento = todosProductos.Where(x => x.Diferencia > 0).OrderByDescending(x => x.Diferencia).Take(10).ToList();
 
@@ -327,7 +333,7 @@ namespace WPF_PAR.MVVM.ViewModels
             }
             catch ( Exception ex )
             {
-                System.Diagnostics.Debug.WriteLine("Error cargando productos: " + ex.Message);
+                Debug.WriteLine("Error cargando productos: " + ex.Message);
             }
         }
 
@@ -340,45 +346,39 @@ namespace WPF_PAR.MVVM.ViewModels
             if ( !string.IsNullOrEmpty(path) )
             {
                 IsLoading = true;
-
-                // Preparamos las listas auxiliares para evitar errores si son null
                 var listAumento = ProductosEnAumento?.ToList() ?? new List<ProductoAnalisisModel>();
                 var listDeclive = ProductosEnDeclive?.ToList() ?? new List<ProductoAnalisisModel>();
 
+                // Capturamos valores locales para usar en el Task
+                int sucId = Filters.SucursalId;
+                string nombreCliente = ClienteSeleccionado.Nombre;
+                var kpis = KpisDetalle;
+
                 await Task.Run(async () =>
                 {
-                    // 1. TRAER DATOS CRUDOS DE SQL (Solo traen Cantidad, no Litros)
                     var fin = DateTime.Now;
                     var inicio = fin.AddYears(-1);
-                    var ventasRaw = await _reportesService.ObtenerVentasBrutasRango(Filters.SucursalId, inicio, fin);
+                    var ventasRaw = await _reportesService.ObtenerVentasBrutasRango(sucId, inicio, fin);
 
-                    // 2. FILTRAR POR CLIENTE
                     var movimientos = ventasRaw
-                        .Where(x => x.Cliente == ClienteSeleccionado.Nombre)
+                        .Where(x => x.Cliente == nombreCliente)
                         .OrderByDescending(x => x.FechaEmision)
                         .Take(100)
                         .ToList();
 
-                    // 3. ENRIQUECER DATOS (EL PASO MÁGICO ✨)
                     foreach ( var venta in movimientos )
                     {
-                        // Preguntamos al catálogo: "¿Qué es este artículo?"
                         var info = _catalogoService.ObtenerInfo(venta.Articulo);
-
-                        // A) Corregimos la Descripción (para que no salga el código feo)
                         venta.Descripcion = info.Descripcion;
-
                         venta.LitrosUnitarios = ( double ) info.Litros;
-
-                        // C) Opcional: Si tu reporte usa la propiedad explícita 'LitrosTotal', llénala manual:
-                        venta.LitrosTotal = venta.Cantidad * ( double ) info.Litros;
+                        // Si tu lógica requiere calcular totales manuales:
+                        // venta.LitrosTotal = venta.Cantidad * (double)info.Litros;
                     }
 
-                    // 4. GENERAR PDF (Ahora sí lleva datos)
                     var exporter = new ExportService();
                     exporter.ExportarPdfCliente(
-                        ClienteSeleccionado,
-                        KpisDetalle,
+                        _clienteSeleccionado, // Ojo: Acceso a variable de clase dentro de Task puede requerir Dispatcher si UI object, pero Model es seguro.
+                        kpis,
                         movimientos,
                         listAumento,
                         listDeclive,
@@ -387,24 +387,20 @@ namespace WPF_PAR.MVVM.ViewModels
                 });
 
                 IsLoading = false;
-
-                // Abrir archivo
-                try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true }); } catch { }
+                try { Process.Start(new ProcessStartInfo(path) { UseShellExecute = true }); } catch { }
             }
         }
+
         private (DateTime Inicio, DateTime Fin) ObtenerRangoFechas()
         {
             int anio = AnioSeleccionado;
             int mes = DateTime.Now.Month;
 
             if ( ModoSeleccionado == "Anual" )
-            {
                 return (new DateTime(anio, 1, 1), new DateTime(anio, 12, 31));
-            }
 
             if ( ModoSeleccionado == "Semestral" )
             {
-
                 bool esS2 = mes > 6;
                 return esS2
                     ? (new DateTime(anio, 7, 1), new DateTime(anio, 12, 31))
@@ -413,15 +409,15 @@ namespace WPF_PAR.MVVM.ViewModels
 
             if ( ModoSeleccionado == "Trimestral" )
             {
-                // Determinamos Q actual
-                if ( mes <= 3 ) return (new DateTime(anio, 1, 1), new DateTime(anio, 3, 31));       // Q1
-                if ( mes <= 6 ) return (new DateTime(anio, 4, 1), new DateTime(anio, 6, 30));       // Q2
-                if ( mes <= 9 ) return (new DateTime(anio, 7, 1), new DateTime(anio, 9, 30));       // Q3
-                return (new DateTime(anio, 10, 1), new DateTime(anio, 12, 31));                   // Q4
+                if ( mes <= 3 ) return (new DateTime(anio, 1, 1), new DateTime(anio, 3, 31));
+                if ( mes <= 6 ) return (new DateTime(anio, 4, 1), new DateTime(anio, 6, 30));
+                if ( mes <= 9 ) return (new DateTime(anio, 7, 1), new DateTime(anio, 9, 30));
+                return (new DateTime(anio, 10, 1), new DateTime(anio, 12, 31));
             }
 
             return (new DateTime(anio, 1, 1), new DateTime(anio, 12, 31));
         }
+
         private async void CargarDetalleAdicional(ClienteResumenModel cliente)
         {
             if ( cliente == null ) return;
@@ -429,10 +425,7 @@ namespace WPF_PAR.MVVM.ViewModels
 
             try
             {
-                // KPIs (Se mantienen fijos anuales, o podrías hacerlos dinámicos igual)
                 KpisDetalle = await _reportesService.ObtenerKpisCliente(cliente.Nombre, AnioSeleccionado, Filters.SucursalId);
-
-                // Productos (Ahora son dinámicos)
                 await CargarProductosDinamicos();
             }
             catch ( Exception ex )
@@ -446,26 +439,20 @@ namespace WPF_PAR.MVVM.ViewModels
         }
 
         // =============================================================================
-        // LÓGICA VISUAL Y GRÁFICAS
+        // LÓGICA VISUAL
         // =============================================================================
         private void CalcularVisibilidadPeriodos()
         {
-            // Lógica Exclusiva por Modo
             bool esTri = ModoSeleccionado == "Trimestral";
             bool esSem = ModoSeleccionado == "Semestral";
-            // Si es "Anual", ambos serán false y se ocultará todo el detalle (dejando solo el total anual)
 
-            // TRIMESTRES: Visibles solo si el modo es Trimestral
             VisibilityQ1 = esTri ? Visibility.Visible : Visibility.Collapsed;
             VisibilityQ2 = esTri ? Visibility.Visible : Visibility.Collapsed;
             VisibilityQ3 = esTri ? Visibility.Visible : Visibility.Collapsed;
             VisibilityQ4 = esTri ? Visibility.Visible : Visibility.Collapsed;
-
-            // SEMESTRES: Visibles solo si el modo es Semestral
             VisibilityS1 = esSem ? Visibility.Visible : Visibility.Collapsed;
             VisibilityS2 = esSem ? Visibility.Visible : Visibility.Collapsed;
 
-            // Notificar a la vista
             OnPropertyChanged(nameof(VisibilityQ1)); OnPropertyChanged(nameof(VisibilityQ2));
             OnPropertyChanged(nameof(VisibilityQ3)); OnPropertyChanged(nameof(VisibilityQ4));
             OnPropertyChanged(nameof(VisibilityS1)); OnPropertyChanged(nameof(VisibilityS2));
@@ -473,7 +460,6 @@ namespace WPF_PAR.MVVM.ViewModels
 
         private void ActualizarGrafica()
         {
-            // Solo dibujamos si hay cliente seleccionado y tiene historia
             if ( ClienteSeleccionado == null || ClienteSeleccionado.HistoriaMensualActual == null )
             {
                 SeriesGrafica = null;
@@ -484,11 +470,10 @@ namespace WPF_PAR.MVVM.ViewModels
             var valores = new List<decimal>();
             string[] etiquetas = null;
 
-            // Agrupar datos según el modo de vista
             switch ( ModoSeleccionado )
             {
                 case "Anual":
-                    valores = historia; // 12 meses
+                    valores = historia;
                     etiquetas = new[] { "ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SEP", "OCT", "NOV", "DIC" };
                     break;
                 case "Semestral":
@@ -502,7 +487,6 @@ namespace WPF_PAR.MVVM.ViewModels
                     break;
             }
 
-            // Configurar LiveCharts
             SeriesGrafica = new ISeries[]
             {
                 new LineSeries<decimal>
@@ -526,10 +510,9 @@ namespace WPF_PAR.MVVM.ViewModels
             OnPropertyChanged(nameof(EjeYGrafica));
         }
 
-        // Método vital para evitar crashes al salir de la pantalla
         public void DetenerRenderizado()
         {
-            SeriesGrafica = null; // Detiene el ticker de LiveCharts
+            SeriesGrafica = null;
         }
 
         private void FiltrarTabla()

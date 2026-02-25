@@ -81,14 +81,11 @@ namespace WPF_PAR.Core.Services
             result.Add(currentField);
             return result;
         }
-        // Services/CatalogoService.cs
 
         public ProductoInfo ObtenerInfo(string claveProducto)
         {
             if ( _catalogo.ContainsKey(claveProducto) ) return _catalogo[claveProducto];
 
-            // CORRECCIÓN: Asignar valores por defecto a TODAS las propiedades de texto
-            // para evitar que sean null y causen errores al usar .Trim() o .ToUpper()
             return new ProductoInfo
             {
                 FamiliaSimple = "Accesorios",

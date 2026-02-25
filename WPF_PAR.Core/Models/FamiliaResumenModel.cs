@@ -13,7 +13,7 @@ namespace WPF_PAR.Core.Models
         public string ColorFondo { get; set; }
         public string ProductoEstrella { get; set; }
         public string ColorTexto { get; set; }
-        public double PorcentajeParticipacion { get; set; } // Para la barra de progreso y el texto %
+        public double PorcentajeParticipacion { get; set; } 
         public double LitrosTotal { get; set; }
     }
 }

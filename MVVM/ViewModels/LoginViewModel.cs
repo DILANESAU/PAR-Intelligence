@@ -2,8 +2,10 @@
 using System.Windows;
 using System.Windows.Controls;
 
+// Usings necesarios
 using WPF_PAR.Converters;
-using WPF_PAR.Services;
+using WPF_PAR.Services;      // Si AuthService está aquí
+// using WPF_PAR.Core.Services; // O aquí, revisa dónde vive AuthService
 
 namespace WPF_PAR.MVVM.ViewModels
 {
@@ -39,13 +41,15 @@ namespace WPF_PAR.MVVM.ViewModels
         public RelayCommand LoginCommand { get; set; }
         public RelayCommand ExitCommand { get; set; }
 
-        public LoginViewModel(AuthService authService)
+        // CONSTRUCTOR ACTUALIZADO: Recibe string connectionString
+        public LoginViewModel(string connectionString)
         {
-            _authService = authService;
+            // Creamos el servicio de autenticación con la conexión
+            _authService = new AuthService(connectionString);
 
             LoginCommand = new RelayCommand(async param =>
             {
-                // 1. VALIDACIÓN PRIMERO (Antes de llamar a la BD)
+                // 1. VALIDACIÓN
                 if ( IsBusy ) return;
 
                 var passwordBox = param as PasswordBox;
@@ -61,33 +65,32 @@ namespace WPF_PAR.MVVM.ViewModels
                 IsBusy = true;
                 ErrorMessage = string.Empty;
 
-                // Delay estético
-                await Task.Delay(1000);
+                await Task.Delay(1000); // Delay estético
 
                 try
                 {
-                    // 3. LLAMADA A BD (Ahora sí, dentro del Try-Catch)
+                    // 3. LLAMADA A BD
                     var usuarioEncontrado = await _authService.ValidarLoginAsync(Username, password);
 
                     IsBusy = false;
 
                     if ( usuarioEncontrado != null )
                     {
-                        // 4. ¡CRUCIAL! GUARDAR EN SESIÓN
-                        // Sin esto, el MainViewModel explota
+                        // 4. GUARDAR EN SESIÓN
                         Session.UsuarioActual = usuarioEncontrado;
 
                         if ( Application.Current is App app )
                         {
-                            app.AbrirMainWindow();
+                            app.AbrirMainWindow(); // <--- Asegúrate de tener este método en App.xaml.cs
+                        }
 
-                            foreach ( Window window in Application.Current.Windows )
+                        // Cerrar ventana actual (Login)
+                        foreach ( Window window in Application.Current.Windows )
+                        {
+                            if ( window.DataContext == this )
                             {
-                                if ( window is Views.LoginWindow )
-                                {
-                                    window.Close();
-                                    break;
-                                }
+                                window.Close();
+                                break;
                             }
                         }
                     }

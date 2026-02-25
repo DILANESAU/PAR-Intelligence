@@ -14,10 +14,11 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Data;
 
+// Tus Usings
 using WPF_PAR.Converters;
 using WPF_PAR.Core.Models;
-using WPF_PAR.Core.Services;
-using WPF_PAR.Services;
+using WPF_PAR.Core.Services; // Apunta al Core
+using WPF_PAR.Services;      // Apunta a los servicios UI locales
 using WPF_PAR.Services.Interfaces;
 
 namespace WPF_PAR.MVVM.ViewModels
@@ -29,10 +30,13 @@ namespace WPF_PAR.MVVM.ViewModels
         private readonly CatalogoService _catalogoService;
         private readonly ChartService _chartService;
         private readonly FamiliaLogicService _familiaLogic;
-        private readonly IDialogService _dialogService;
-        private readonly INotificationService _notificationService;
         private readonly SucursalesService _sucursalesService;
         private readonly CacheService _cacheService;
+
+        // SERVICIOS UI
+        private readonly IDialogService _dialogService;
+        private readonly INotificationService _notificationService;
+
         public FilterService Filters { get; }
 
         private bool _isInitialized = false;
@@ -42,6 +46,7 @@ namespace WPF_PAR.MVVM.ViewModels
         public ObservableCollection<FamiliaResumenModel> TarjetasArquitectonica { get; set; } = new ObservableCollection<FamiliaResumenModel>();
         public ObservableCollection<FamiliaResumenModel> TarjetasEspecializada { get; set; } = new ObservableCollection<FamiliaResumenModel>();
         public ObservableCollection<SucursalModel> Sucursales { get; set; } = new ObservableCollection<SucursalModel>();
+
         private SucursalModel _sucursalSeleccionada;
         public SucursalModel SucursalSeleccionada
         {
@@ -53,12 +58,9 @@ namespace WPF_PAR.MVVM.ViewModels
                     _sucursalSeleccionada = value;
                     OnPropertyChanged();
 
-                    // Cuando cambia la sucursal, actualizamos el Filtro Global y recargamos
                     if ( value != null )
                     {
                         Filters.SucursalId = value.Id;
-
-                        // Solo recargamos si ya estábamos inicializados para evitar doble carga al inicio
                         if ( _isInitialized )
                         {
                             EjecutarReporte();
@@ -79,20 +81,20 @@ namespace WPF_PAR.MVVM.ViewModels
 
         // Títulos
         public string TituloGraficoPastel { get; set; } = "Distribución";
-
-        // --- BARRAS DOBLES (Clientes y Productos) ---
         public string TituloBarrasClientes { get; set; } = "Top Clientes";
         public string TituloBarrasProductos { get; set; } = "Top Productos";
 
         private decimal _cacheVentaGlobal;
         private double _cacheLitrosGlobal;
-        private string _tituloReporteCard = "📥 REPORTE COMPLETO"; // Texto dinámico del botón
+        private string _tituloReporteCard = "📥 REPORTE COMPLETO";
 
         public string TituloReporteCard
         {
             get => _tituloReporteCard;
             set { _tituloReporteCard = value; OnPropertyChanged(); }
         }
+
+        // GRÁFICOS
         public ISeries[] SeriesBarrasClientes { get; set; }
         public Axis[] EjeXBarrasClientes { get; set; }
         public Axis[] EjeYBarrasClientes { get; set; }
@@ -100,6 +102,13 @@ namespace WPF_PAR.MVVM.ViewModels
         public ISeries[] SeriesBarrasProductos { get; set; }
         public Axis[] EjeXBarrasProductos { get; set; }
         public Axis[] EjeYBarrasProductos { get; set; }
+
+        public ISeries[] SeriesPastelDinero { get; set; }
+        public ISeries[] SeriesPastelLitros { get; set; }
+
+        public ISeries[] SeriesComportamientoLineas { get; set; }
+        public Axis[] EjeXMensual { get; set; }
+        public SolidColorPaint LegendTextPaint { get; set; }
 
         // --- CONTROL TOP N ---
         public ObservableCollection<int> OpcionesTop { get; } = new ObservableCollection<int> { 5, 10, 15, 20, 50 };
@@ -118,16 +127,7 @@ namespace WPF_PAR.MVVM.ViewModels
                 }
             }
         }
-        // Propiedad vital para el ScrollViewer
         public double AlturaGraficaDinamica => Math.Max(450, TopSeleccionado * 50);
-
-        // --- PASTELES ---
-        public ISeries[] SeriesPastelDinero { get; set; }
-        public ISeries[] SeriesPastelLitros { get; set; }
-
-        public ISeries[] SeriesComportamientoLineas { get; set; }
-        public Axis[] EjeXMensual { get; set; }
-        public SolidColorPaint LegendTextPaint { get; set; }
 
         // ESTADO
         private List<VentaReporteModel> _ventasProcesadas;
@@ -166,12 +166,9 @@ namespace WPF_PAR.MVVM.ViewModels
             {
                 _excluirBlancos = value;
                 OnPropertyChanged();
-                ActualizarGraficosPorSubLinea(); // <--- Recalcula al cambiar el switch
+                ActualizarGraficosPorSubLinea();
             }
         }
-
-        // Usamos la lista del servicio FilterService, pero si necesitas exponerla localmente:
-        // public ObservableCollection<KeyValuePair<int, string>> ListaSucursales => Filters.ListaSucursales; 
 
         public ObservableCollection<SubLineaPerformanceModel> ListaDesglose { get; set; }
 
@@ -185,34 +182,27 @@ namespace WPF_PAR.MVVM.ViewModels
         public RelayCommand OrdenarNombreCommand { get; set; }
         public RelayCommand ExportarGlobalCommand { get; set; }
 
-        public FamiliaViewModel(
-             IDialogService dialogService,
-             BusinessLogicService businessLogic,
-            FilterService filterService,
-            ChartService chartService,
-            FamiliaLogicService familiaLogic,
-            INotificationService notificationService,
-            SucursalesService sucursalesService, CacheService cacheService)
+        public FamiliaViewModel(string connectionString)
         {
-            _dialogService = dialogService;
-            _cacheService = cacheService;
-            Filters = filterService;
-            _chartService = chartService;
-            _familiaLogic = familiaLogic;
-            _notificationService = notificationService;
-            _sucursalesService = sucursalesService;
-            _reportesService = new ReportesService();
+            _reportesService = new ReportesService(connectionString);
+            _sucursalesService = new SucursalesService(connectionString);
+
+            var businessLogic = new BusinessLogicService(); 
             _catalogoService = new CatalogoService(businessLogic);
+
+            _chartService = new ChartService();
+            _familiaLogic = new FamiliaLogicService(businessLogic);
+            _cacheService = new CacheService(connectionString);
+
+            _dialogService = new DialogService();
+            _notificationService = new NotificationService();
+            Filters = new FilterService(connectionString);
 
             _ventasProcesadas = new List<VentaReporteModel>();
             _datosAnualesCache = new List<VentaReporteModel>();
 
-            // MODIFICACIÓN: Ya no llamamos a CargarListaSucursales aquí 
-            // para evitar conflictos con la inicialización de la View.
-
             ActualizarColoresGraficos();
 
-            // Comandos
             ActualizarCommand = new RelayCommand(o => EjecutarReporte());
             OrdenarVentaCommand = new RelayCommand(o => AplicarOrden("VENTA"));
             OrdenarNombreCommand = new RelayCommand(o => AplicarOrden("NOMBRE"));
@@ -226,15 +216,13 @@ namespace WPF_PAR.MVVM.ViewModels
 
             Filters.OnFiltrosCambiados += EjecutarReporte;
         }
+
         private void RestaurarVistaGeneral()
         {
             VerResumen = true;
-
-            // RESTAURAR LOS VALORES GLOBALES DESDE LA CACHÉ
             GranTotalVenta = _cacheVentaGlobal;
             GranTotalLitros = _cacheLitrosGlobal;
             TituloReporteCard = "📥 REPORTE GLOBAL";
-
             OnPropertyChanged(nameof(GranTotalVenta));
             OnPropertyChanged(nameof(GranTotalLitros));
         }
@@ -257,16 +245,13 @@ namespace WPF_PAR.MVVM.ViewModels
 
         public void CargarDatosIniciales()
         {
-            // 1. Cargamos sucursales solo si la lista está vacía
             if ( Sucursales.Count == 0 )
             {
                 try
                 {
                     Sucursales.Clear();
-                    // Opción "TODAS" siempre presente
                     Sucursales.Add(new SucursalModel { Id = 0, Nombre = "0 - TODAS" });
 
-                    // Obtenemos los datos (ahora incrustados en el servicio)
                     var dic = _sucursalesService.CargarSucursales();
                     if ( dic != null )
                     {
@@ -274,11 +259,8 @@ namespace WPF_PAR.MVVM.ViewModels
                             Sucursales.Add(new SucursalModel { Id = kvp.Key, Nombre = $"{kvp.Key} - {kvp.Value}" });
                     }
 
-                    // Seleccionamos la sucursal por defecto guardada en Configuración
                     int idGuardado = Properties.Settings.Default.SucursalDefaultId;
                     var encontrada = Sucursales.FirstOrDefault(s => s.Id == idGuardado);
-
-                    // Esto dispara el setter y actualiza el Filtro Global
                     SucursalSeleccionada = encontrada ?? Sucursales.First();
                 }
                 catch ( Exception ex )
@@ -287,7 +269,6 @@ namespace WPF_PAR.MVVM.ViewModels
                 }
             }
 
-            // 2. Si es la primera vez que entramos a la pestaña, ejecutamos el reporte
             if ( !_isInitialized )
             {
                 _notificationService.ShowInfo("Cargando datos de familias...");
@@ -296,7 +277,7 @@ namespace WPF_PAR.MVVM.ViewModels
                 _isInitialized = true;
             }
         }
-        
+
         public void CargarPorLinea(string linea)
         {
             _lineaActual = linea;
@@ -314,20 +295,17 @@ namespace WPF_PAR.MVVM.ViewModels
 
         public void DetenerRenderizado()
         {
-            // Poner las series en null o en array vacío detiene los cálculos de dibujo
             SeriesPastelDinero = Array.Empty<ISeries>();
             SeriesPastelLitros = Array.Empty<ISeries>();
-            //SeriesBarrasTop = Array.Empty<ISeries>();
             SeriesBarrasClientes = Array.Empty<ISeries>();
             SeriesBarrasProductos = Array.Empty<ISeries>();
 
-            // Notificar a la vista para que se actualice antes de morir
             OnPropertyChanged(nameof(SeriesPastelDinero));
             OnPropertyChanged(nameof(SeriesPastelLitros));
             OnPropertyChanged(nameof(SeriesBarrasProductos));
             OnPropertyChanged(nameof(SeriesBarrasClientes));
-            //OnPropertyChanged(nameof(SeriesBarrasTop));
         }
+
         private async void EjecutarReporte()
         {
             IsLoading = true;
@@ -373,16 +351,13 @@ namespace WPF_PAR.MVVM.ViewModels
         {
             var (arqui, espe) = _familiaLogic.CalcularResumenGlobal(_ventasProcesadas);
 
-            // 1. Calculamos los globales REALES
             _cacheVentaGlobal = _ventasProcesadas.Sum(x => x.TotalVenta);
             _cacheLitrosGlobal = _ventasProcesadas.Sum(x => x.LitrosTotales);
 
-            // 2. Los asignamos a la vista
             GranTotalVenta = _cacheVentaGlobal;
             GranTotalLitros = _cacheLitrosGlobal;
-            TituloReporteCard = "📥 REPORTE GLOBAL"; // Texto por defecto
+            TituloReporteCard = "📥 REPORTE GLOBAL";
 
-            // ... resto del código (asignar TarjetasFamilias, etc.)
             IEnumerable<FamiliaResumenModel> resultado;
             if ( _lineaActual == "Arquitectonica" ) resultado = arqui;
             else if ( _lineaActual == "Especializada" ) resultado = espe;
@@ -390,7 +365,6 @@ namespace WPF_PAR.MVVM.ViewModels
 
             TarjetasFamilias = new ObservableCollection<FamiliaResumenModel>(resultado);
 
-            // Notificar cambios
             OnPropertyChanged(nameof(GranTotalVenta));
             OnPropertyChanged(nameof(GranTotalLitros));
             OnPropertyChanged(nameof(TarjetasFamilias));
@@ -401,15 +375,12 @@ namespace WPF_PAR.MVVM.ViewModels
             TituloDetalle = familia;
             _datosFamiliaActual = _ventasProcesadas.Where(x => x.Familia == familia).ToList();
 
-            // --- CAMBIO CLAVE: Actualizar los KPIs superiores con datos de LA FAMILIA ---
             GranTotalVenta = _datosFamiliaActual.Sum(x => x.TotalVenta);
             GranTotalLitros = _datosFamiliaActual.Sum(x => x.LitrosTotales);
-            TituloReporteCard = "📥 DESCARGAR DETALLE"; // Cambiamos el texto del botón
+            TituloReporteCard = "📥 DESCARGAR DETALLE";
 
-            // Notificar a la vista para que los números cambien
             OnPropertyChanged(nameof(GranTotalVenta));
             OnPropertyChanged(nameof(GranTotalLitros));
-            // --------------------------------------------------------------------------
 
             SubLineasDisponibles.Clear();
             SubLineasDisponibles.Add("TODAS");
@@ -427,7 +398,6 @@ namespace WPF_PAR.MVVM.ViewModels
         {
             if ( _datosFamiliaActual == null ) return;
 
-            // 1. Filtrado Base (Quitamos Ferretería si aplica)
             var datosBase = _datosFamiliaActual
                 .Where(x => !x.Linea.Contains("FERRETERIA", StringComparison.OrdinalIgnoreCase))
                 .ToList();
@@ -441,10 +411,8 @@ namespace WPF_PAR.MVVM.ViewModels
 
             DetalleVentas = new ObservableCollection<VentaReporteModel>(datosFiltrados.OrderByDescending(x => x.TotalVenta));
 
-            // Títulos
             TituloGraficoPastel = esVistaGlobal ? "Distribución por Línea ($)" : "Distribución por Producto ($)";
 
-            // Datos para Pasteles (Agrupación)
             var resumenDatos = esVistaGlobal
                 ? datosFiltrados
                     .GroupBy(x => x.Linea)
@@ -455,11 +423,6 @@ namespace WPF_PAR.MVVM.ViewModels
                     .Select(g => new { Nombre = g.Key, Venta = g.Sum(x => x.TotalVenta), Litros = ( double ) g.Sum(x => x.LitrosTotales) })
                     .ToList();
 
-            // ========================================================================
-            // 1. GRÁFICOS DE PASTEL (Estilo Sólido - InnerRadius 0)
-            // ========================================================================
-
-            // Pastel Dinero
             SeriesPastelDinero = resumenDatos
                 .OrderByDescending(x => x.Venta)
                 .Take(5)
@@ -467,18 +430,14 @@ namespace WPF_PAR.MVVM.ViewModels
                 {
                     Values = new double[] { ( double ) x.Venta },
                     Name = NormalizarNombreProducto(x.Nombre),
-                    InnerRadius = 0, // CERO para pastel completo
-
-                    // Formato limpio: "$1,500 (45%)"
+                    InnerRadius = 0,
                     DataLabelsFormatter = p => $"{p.Model:C0} ({p.StackedValue.Share:P0})",
-
                     DataLabelsPosition = LiveChartsCore.Measure.PolarLabelsPosition.Outer,
                     DataLabelsPaint = new SolidColorPaint(SKColors.Black),
                     DataLabelsSize = 11,
                     ToolTipLabelFormatter = p => $"{p.Context.Series.Name}: {p.Model:C0} ({p.StackedValue.Share:P1})"
                 }).ToArray();
 
-            // Pastel Litros
             SeriesPastelLitros = resumenDatos
                 .OrderByDescending(x => x.Litros)
                 .Take(5)
@@ -486,52 +445,36 @@ namespace WPF_PAR.MVVM.ViewModels
                 {
                     Values = new double[] { x.Litros },
                     Name = NormalizarNombreProducto(x.Nombre),
-                    InnerRadius = 0, // CERO para pastel completo
-
-                    // Formato limpio: "500 L (20%)"
+                    InnerRadius = 0,
                     DataLabelsFormatter = p => $"{p.Model:N0} L ({p.StackedValue.Share:P0})",
-
                     DataLabelsPosition = LiveChartsCore.Measure.PolarLabelsPosition.Outer,
                     DataLabelsPaint = new SolidColorPaint(SKColors.Black),
                     DataLabelsSize = 11,
                     ToolTipLabelFormatter = p => $"{p.Context.Series.Name}: {p.Model:N0} L ({p.StackedValue.Share:P1})"
                 }).ToArray();
 
-
-            // ========================================================================
-            // 2. GRÁFICOS DE BARRAS (Top Clientes y Productos)
-            // ========================================================================
-
-            // --- IZQUIERDA: TOP CLIENTES ---
-            // (A los clientes NO les aplicamos el filtro de blancos, queremos ver quién compra más en general)
             var datosParaClientes = datosFiltrados.Select(x => new VentaReporteModel
             {
-                Descripcion = x.Cliente, // TRUCO: Pasamos Cliente en la Descripción para que el servicio agrupe por Cliente
+                Descripcion = x.Cliente,
                 TotalVenta = x.TotalVenta,
                 Cantidad = x.LitrosTotales,
                 LitrosUnitarios = 1
             }).ToList();
 
             var resClientes = _chartService.GenerarTopProductos(datosParaClientes, VerPorLitros, TopSeleccionado);
-
             SeriesBarrasClientes = resClientes.Series;
             EjeXBarrasClientes = resClientes.EjesX;
             EjeYBarrasClientes = resClientes.EjesY;
             TituloBarrasClientes = $"Top {TopSeleccionado} Clientes";
 
-
-            // --- DERECHA: TOP PRODUCTOS (Con lógica de Excluir Blancos) ---
             var datosParaProductos = datosFiltrados.ToList();
-
             if ( ExcluirBlancos )
             {
-                // Filtramos cualquier producto que parezca BLANCO
                 datosParaProductos = datosParaProductos
                     .Where(x => !x.Descripcion.ToUpper().Contains("BLANCO")
                              && !x.Descripcion.ToUpper().Contains(" BCO ")
                              && !x.Descripcion.ToUpper().EndsWith(" BCO"))
                     .ToList();
-
                 TituloBarrasProductos = $"Top {TopSeleccionado} Colores (Sin Blancos)";
             }
             else
@@ -540,34 +483,60 @@ namespace WPF_PAR.MVVM.ViewModels
             }
 
             var resProductos = _chartService.GenerarTopProductos(datosParaProductos, VerPorLitros, TopSeleccionado);
-
             SeriesBarrasProductos = resProductos.Series;
             EjeXBarrasProductos = resProductos.EjesX;
             EjeYBarrasProductos = resProductos.EjesY;
 
-            // ========================================================================
-            // 3. NOTIFICACIONES A LA VISTA
-            // ========================================================================
             OnPropertyChanged(nameof(SeriesPastelDinero));
             OnPropertyChanged(nameof(SeriesPastelLitros));
             OnPropertyChanged(nameof(TituloGraficoPastel));
-
             OnPropertyChanged(nameof(SeriesBarrasClientes));
             OnPropertyChanged(nameof(EjeXBarrasClientes));
             OnPropertyChanged(nameof(EjeYBarrasClientes));
             OnPropertyChanged(nameof(TituloBarrasClientes));
-
             OnPropertyChanged(nameof(SeriesBarrasProductos));
             OnPropertyChanged(nameof(EjeXBarrasProductos));
             OnPropertyChanged(nameof(EjeYBarrasProductos));
             OnPropertyChanged(nameof(TituloBarrasProductos));
         }
-        private string Truncar(string t, int m) => t.Length > m ? t.Substring(0, m - 3) + "..." : t;
-        private string NormalizarNombreProducto(string n) { if ( string.IsNullOrEmpty(n) ) return ""; string l = n.Trim(); if ( l.Contains("-") ) { var p = l.Split('-'); if ( p.Length > 1 ) l = p[1]; } return System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase(l.ToLower()); }
 
-        private void AplicarOrden(string criterio) { if ( TarjetasFamilias != null ) { TarjetasFamilias = new ObservableCollection<FamiliaResumenModel>(_familiaLogic.OrdenarTarjetas(TarjetasFamilias.ToList(), criterio)); OnPropertyChanged(nameof(TarjetasFamilias)); } }
-        private void GenerarDesglosePorPeriodo(string periodo) { if ( _datosAnualesCache != null && _datosAnualesCache.Any() ) { var datos = _datosAnualesCache.Where(x => x.Familia == TituloDetalle).ToList(); var g = _chartService.GenerarTendenciaLineas(datos, periodo); SeriesComportamientoLineas = g.Series; EjeXMensual = g.EjesX; OnPropertyChanged(nameof(SeriesComportamientoLineas)); OnPropertyChanged(nameof(EjeXMensual)); var l = _familiaLogic.CalcularDesgloseClientes(datos, periodo == "ANUAL" ? "TRIMESTRAL" : periodo); ListaDesglose = new ObservableCollection<SubLineaPerformanceModel>(l); OnPropertyChanged(nameof(ListaDesglose)); } }
-        // En FamiliaViewModel.cs
+        private string NormalizarNombreProducto(string n)
+        {
+            if ( string.IsNullOrEmpty(n) ) return "";
+            string l = n.Trim();
+            if ( l.Contains("-") )
+            {
+                var p = l.Split('-');
+                if ( p.Length > 1 ) l = p[1];
+            }
+            return System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase(l.ToLower());
+        }
+
+        private void AplicarOrden(string criterio)
+        {
+            if ( TarjetasFamilias != null )
+            {
+                TarjetasFamilias = new ObservableCollection<FamiliaResumenModel>(_familiaLogic.OrdenarTarjetas(TarjetasFamilias.ToList(), criterio));
+                OnPropertyChanged(nameof(TarjetasFamilias));
+            }
+        }
+
+        private void GenerarDesglosePorPeriodo(string periodo)
+        {
+            if ( _datosAnualesCache != null && _datosAnualesCache.Any() )
+            {
+                var datos = _datosAnualesCache.Where(x => x.Familia == TituloDetalle).ToList();
+                var g = _chartService.GenerarTendenciaLineas(datos, periodo);
+                SeriesComportamientoLineas = g.Series;
+                EjeXMensual = g.EjesX;
+                OnPropertyChanged(nameof(SeriesComportamientoLineas));
+                OnPropertyChanged(nameof(EjeXMensual));
+
+                var l = _familiaLogic.CalcularDesgloseClientes(datos, periodo == "ANUAL" ? "TRIMESTRAL" : periodo);
+                ListaDesglose = new ObservableCollection<SubLineaPerformanceModel>(l);
+                OnPropertyChanged(nameof(ListaDesglose));
+            }
+        }
 
         private async void GenerarReporteExcel(bool esGlobal)
         {
@@ -579,7 +548,6 @@ namespace WPF_PAR.MVVM.ViewModels
                 return;
             }
 
-            // Cambiamos la extensión a .xlsx
             string path = _dialogService.ShowSaveFileDialog("Excel|*.xlsx", $"Reporte_{DateTime.Now:yyyyMMdd}.xlsx");
 
             if ( !string.IsNullOrEmpty(path) )
@@ -587,14 +555,31 @@ namespace WPF_PAR.MVVM.ViewModels
                 IsLoading = true;
                 await Task.Run(() =>
                 {
-                    // Usamos el nuevo servicio
                     var exporter = new ExportService();
                     exporter.ExportarExcelVentas(datosParaExportar, path);
                 });
-
                 IsLoading = false;
             }
         }
-        private void FiltrarTabla() { if ( DetalleVentas != null ) { var v = CollectionViewSource.GetDefaultView(DetalleVentas); if ( string.IsNullOrWhiteSpace(TextoBusqueda) ) v.Filter = null; else { string t = TextoBusqueda.ToUpper(); v.Filter = o => { if ( o is VentaReporteModel m ) return ( m.Cliente?.ToUpper().Contains(t) ?? false ) || ( m.Descripcion?.ToUpper().Contains(t) ?? false ); return false; }; } } }
+
+        private void FiltrarTabla()
+        {
+            if ( DetalleVentas != null )
+            {
+                var v = CollectionViewSource.GetDefaultView(DetalleVentas);
+                if ( string.IsNullOrWhiteSpace(TextoBusqueda) )
+                    v.Filter = null;
+                else
+                {
+                    string t = TextoBusqueda.ToUpper();
+                    v.Filter = o =>
+                    {
+                        if ( o is VentaReporteModel m )
+                            return ( m.Cliente?.ToUpper().Contains(t) ?? false ) || ( m.Descripcion?.ToUpper().Contains(t) ?? false );
+                        return false;
+                    };
+                }
+            }
+        }
     }
 }

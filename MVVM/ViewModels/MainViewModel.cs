@@ -28,6 +28,7 @@ namespace WPF_PAR.MVVM.ViewModels
             get => _userRol;
             set { _userRol = value; OnPropertyChanged(); }
         }
+
         // --- COMANDOS ---
         public RelayCommand DashboardViewCommand { get; set; }
         public RelayCommand FamiliaViewCommand { get; set; }
@@ -51,8 +52,7 @@ namespace WPF_PAR.MVVM.ViewModels
             {
                 _currentView = value;
                 OnPropertyChanged();
-
-                // Lógica automática: Ocultar filtros y Cambiar Título
+                // Lógica automática: Ocultar filtros si es Settings
                 AreFiltersVisible = !( value is SettingsViewModel );
             }
         }
@@ -72,24 +72,9 @@ namespace WPF_PAR.MVVM.ViewModels
         }
 
         public SnackbarMessageQueue MessageQueue { get; }
-
-        // --- CONSTRUCTOR ---
-        public MainViewModel(
-            FilterService filterService,
-            DashboardViewModel dashboardVM,
-            FamiliaViewModel familiaVM,
-            ClientesViewModel clientesVM,
-            SettingsViewModel settingsVM,
-            INotificationService notificationService)
+        public MainViewModel(string connectionString)
         {
-            GlobalFilters = filterService;
-            DashboardVM = dashboardVM;
-            FamiliaVM = familiaVM;
-            ClientesVM = clientesVM;
-            SettingsVM = settingsVM;
-            ListaSucursales = filterService.ListaSucursales;
-
-            // Cargar datos de sesión
+            // 1. Cargar datos de sesión
             if ( Session.UsuarioActual != null )
             {
                 UserName = Session.UsuarioActual.NombreCompleto;
@@ -101,11 +86,21 @@ namespace WPF_PAR.MVVM.ViewModels
                 UserRol = "Invitado";
             }
 
-            // Comandos
+            var notificationService = new NotificationService();
+            MessageQueue = notificationService.MessageQueue;
+
+            GlobalFilters = new FilterService(connectionString);
+            ListaSucursales = GlobalFilters.ListaSucursales;
+
+            DashboardVM = new DashboardViewModel(connectionString);
+            FamiliaVM = new FamiliaViewModel(connectionString);
+            ClientesVM = new ClientesViewModel(connectionString);
+            SettingsVM = new SettingsViewModel(); 
+
             DashboardViewCommand = new RelayCommand(o =>
             {
                 CurrentView = DashboardVM;
-                DashboardVM.CargarDatosIniciales(); // <--- TRIGGER ON NAVIGATION
+                DashboardVM.CargarDatosIniciales();
             });
 
             FamiliaViewCommand = new RelayCommand(o =>
@@ -116,7 +111,7 @@ namespace WPF_PAR.MVVM.ViewModels
 
             ClientesViewCommand = new RelayCommand(o =>
             {
-                FamiliaVM.DetenerRenderizado();
+                FamiliaVM.DetenerRenderizado(); // Optimización
                 CurrentView = ClientesVM;
                 ClientesVM.CargarDatosIniciales();
             });
@@ -134,14 +129,9 @@ namespace WPF_PAR.MVVM.ViewModels
 
             ToggleMenuCommand = new RelayCommand(o => IsMenuOpen = !IsMenuOpen);
 
-            if ( notificationService is NotificationService servicioConcreto )
-            {
-                MessageQueue = servicioConcreto.MessageQueue;
-            }
-
-            // Vista Inicial
-            //CurrentView = DashboardVM;
+            // 5. Vista Inicial
+            CurrentView = DashboardVM;
+            DashboardVM.CargarDatosIniciales();
         }
-
     }
 }

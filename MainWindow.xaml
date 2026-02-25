@@ -6,7 +6,9 @@
         xmlns:local="clr-namespace:WPF_PAR"
         xmlns:vm="clr-namespace:WPF_PAR.MVVM.ViewModels"
         xmlns:v="clr-namespace:WPF_PAR.MVVM.Views"
-        xmlns:models="clr-namespace:WPF_PAR.MVVM.Models"
+        
+        xmlns:models="clr-namespace:WPF_PAR.Core.Models"
+        
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
         mc:Ignorable="d"
         Title="PAR Intelligence" Height="768" Width="1280"
@@ -50,7 +52,6 @@
             </Style.Triggers>
         </Style>
 
-        <!-- Agregado: Definición del recurso faltante para evitar el error XDG0010 -->
         <Style x:Key="MaterialDesignSnackbarActionMidButton" TargetType="Button" BasedOn="{StaticResource MaterialDesignFlatButton}">
             <Setter Property="Foreground" Value="{DynamicResource PrimaryHueMidBrush}" />
             <Setter Property="FontWeight" Value="Bold" />
@@ -155,7 +156,7 @@
 
                             <TextBlock Text="{Binding UserName}" 
                                 FontWeight="Bold" 
-                                FontSize="14"
+                                FontSize="14" 
                                 Foreground="{DynamicResource MaterialDesignBody}"
                                 TextTrimming="CharacterEllipsis" 
                                 MaxWidth="150"/>
