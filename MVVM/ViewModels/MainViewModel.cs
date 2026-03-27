@@ -29,20 +29,6 @@ namespace WPF_PAR.MVVM.ViewModels
             set { _userRol = value; OnPropertyChanged(); }
         }
 
-        // --- COMANDOS ---
-        public RelayCommand DashboardViewCommand { get; set; }
-        public RelayCommand FamiliaViewCommand { get; set; }
-        public RelayCommand ClientesViewCommand { get; set; }
-        public RelayCommand SettingsViewCommand { get; set; }
-        public RelayCommand NavegarLineaCommand { get; set; }
-        public RelayCommand ToggleMenuCommand { get; set; }
-
-        // --- VIEWMODELS HIJOS ---
-        public DashboardViewModel DashboardVM { get; }
-        public FamiliaViewModel FamiliaVM { get; }
-        public ClientesViewModel ClientesVM { get; }
-        public SettingsViewModel SettingsVM { get; }
-
         // --- ESTADO DE LA VISTA ---
         private object _currentView;
         public object CurrentView
@@ -73,9 +59,21 @@ namespace WPF_PAR.MVVM.ViewModels
 
         public SnackbarMessageQueue MessageQueue { get; }
 
+        // --- COMANDOS ---
+        public RelayCommand DashboardViewCommand { get; set; }
+        public RelayCommand FamiliaViewCommand { get; set; }
+        public RelayCommand ClientesViewCommand { get; set; }
+        public RelayCommand SettingsViewCommand { get; set; }
+        public RelayCommand ToggleMenuCommand { get; set; }
+
+        // --- VIEWMODELS HIJOS ---
+        public DashboardViewModel DashboardVM { get; }
+        public FamiliaViewModel FamiliaVM { get; }
+        public ClientesViewModel ClientesVM { get; }
+        public SettingsViewModel SettingsVM { get; }
+
         // ==============================================================================
-        // CONSTRUCTOR CORREGIDO (Inyección de Dependencias)
-        // Pedimos los ViewModels y Servicios en lugar del connectionString
+        // CONSTRUCTOR
         // ==============================================================================
         public MainViewModel(
             FilterService filterService,
@@ -89,13 +87,13 @@ namespace WPF_PAR.MVVM.ViewModels
             GlobalFilters = filterService;
             ListaSucursales = GlobalFilters.ListaSucursales;
 
-            // Extraemos la cola de mensajes (asegurando el cast)
+            // Extraemos la cola de mensajes
             if ( notificationService is NotificationService ns )
             {
                 MessageQueue = ns.MessageQueue;
             }
 
-            // 2. Asignamos los ViewModels que nos entregó App.xaml.cs
+            // 2. Asignamos los ViewModels
             DashboardVM = dashboardVM;
             FamiliaVM = familiaVM;
             ClientesVM = clientesVM;
@@ -128,26 +126,16 @@ namespace WPF_PAR.MVVM.ViewModels
 
             ClientesViewCommand = new RelayCommand(o =>
             {
-                FamiliaVM.DetenerRenderizado(); // Optimización
                 CurrentView = ClientesVM;
                 ClientesVM.CargarDatosIniciales();
             });
 
             SettingsViewCommand = new RelayCommand(o => CurrentView = SettingsVM);
 
-            NavegarLineaCommand = new RelayCommand(parametro =>
-            {
-                if ( parametro is string linea )
-                {
-                    CurrentView = FamiliaVM;
-                    FamiliaVM.CargarPorLinea(linea);
-                }
-            });
-
             ToggleMenuCommand = new RelayCommand(o => IsMenuOpen = !IsMenuOpen);
 
-            // Nota: La vista inicial ("CurrentView = DashboardVM") ahora 
-            // se maneja desde el App.xaml.cs en la función AbrirMainWindow()
+            // Eliminamos "NavegarLineaCommand" ya que la navegación por línea 
+            // ya no aplica en esta nueva arquitectura ultra-rápida.
         }
     }
 }

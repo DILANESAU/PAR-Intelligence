@@ -23,5 +23,12 @@ namespace WPF_PAR.Core.Models
         public double LitrosUnitarios { get; set; }
         public double LitrosTotales => ( double ) Cantidad * LitrosUnitarios;
         public double LitrosTotal { get; set; }
+
+        public string Agente { get; set; }
+        public decimal TotalCosto { get; set; }
+
+        // 2️⃣ MAGIA C#: Se calculan solas en milisegundos sin ir a la base de datos
+        public decimal UtilidadBruta => TotalVenta - TotalCosto;
+        public decimal MargenPorcentaje => TotalVenta > 0 ? ( UtilidadBruta / TotalVenta ) : 0;
     }
 }

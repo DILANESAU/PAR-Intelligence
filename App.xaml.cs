@@ -52,16 +52,19 @@ namespace WPF_PAR
             {
                 var secure = provider.GetRequiredService<SecureStorageService>();
                 var settings = WPF_PAR.Properties.Settings.Default;
-                string pass = secure.RecuperarPassword(SecureStorageService.KeyData) ?? "";
-                // Apunta a la BD Intermedia
-                return $"Data Source={settings.Data_Server};Initial Catalog=PAR_System_DB;User ID={settings.Data_User};Password={pass};TrustServerCertificate=True";
+
+                // USAR LAS LLAVES DE AUTH (MINI PC)
+                string pass = secure.RecuperarPassword(SecureStorageService.KeyAuth) ?? "";
+
+                // USAR LOS SETTINGS DE AUTH (MINI PC)
+                return $"Data Source={settings.Auth_Server};Initial Catalog=PAR_System_DB;User ID={settings.Auth_User};Password={pass};TrustServerCertificate=True";
             }
 
             // A) Servicios que leen del ERP (Intelisis)
-            services.AddTransient<ReportesService>(provider => new ReportesService(GetIntelisisConnection(provider)));
-            services.AddTransient<SucursalesService>(provider => new SucursalesService(GetIntelisisConnection(provider)));
-            services.AddTransient<ClientesService>(provider => new ClientesService(GetIntelisisConnection(provider)));
-            services.AddSingleton<FilterService>(provider => new FilterService(GetIntelisisConnection(provider)));
+            services.AddTransient<ReportesService>(provider => new ReportesService(GetParSystemConnection(provider)));
+            services.AddTransient<SucursalesService>(provider => new SucursalesService(GetParSystemConnection(provider)));
+            services.AddTransient<ClientesService>(provider => new ClientesService(GetParSystemConnection(provider)));
+            services.AddSingleton<FilterService>(provider => new FilterService(GetParSystemConnection(provider))); ;
 
             // B) Servicios que leen/escriben de tu BD Local/Intermedia (ParSystem)
             services.AddTransient<AuthService>(provider => new AuthService(GetParSystemConnection(provider)));
@@ -112,7 +115,7 @@ namespace WPF_PAR
 
             // 1. Validar Config Auth
             string authIp = WPF_PAR.Properties.Settings.Default.Auth_Server;
-            var secure = new SecureStorageService();
+            var secure = Services.GetRequiredService<SecureStorageService>();
             string authPass = secure.RecuperarPassword(SecureStorageService.KeyAuth);
 
             // 2. Validar Config Data

@@ -102,17 +102,17 @@ namespace WPF_PAR.MVVM.ViewModels
         }
 
         // --- DATOS PRINCIPALES ---
-        private List<ClienteResumenModel> _todosLosClientes;
-        private ObservableCollection<ClienteResumenModel> _clientesResumen;
-        public ObservableCollection<ClienteResumenModel> ClientesResumen
+        private List<ClienteAnalisisModel> _todosLosClientes;
+        private ObservableCollection<ClienteAnalisisModel> _clientesResumen;
+        public ObservableCollection<ClienteAnalisisModel> ClientesResumen
         {
             get => _clientesResumen;
             set { _clientesResumen = value; OnPropertyChanged(); }
         }
 
         // --- CLIENTE SELECCIONADO ---
-        private ClienteResumenModel _clienteSeleccionado;
-        public ClienteResumenModel ClienteSeleccionado
+        private ClienteAnalisisModel _clienteSeleccionado;
+        public ClienteAnalisisModel ClienteSeleccionado
         {
             get => _clienteSeleccionado;
             set
@@ -185,6 +185,8 @@ namespace WPF_PAR.MVVM.ViewModels
         private int _totalClientesInactivos;
         public int TotalClientesInactivos { get => _totalClientesInactivos; set { _totalClientesInactivos = value; OnPropertyChanged(); } }
 
+        private readonly ClientesService _clientesService;
+
         // --- VISIBILIDAD ---
         public Visibility VisibilityQ1 { get; set; } = Visibility.Collapsed;
         public Visibility VisibilityQ2 { get; set; } = Visibility.Collapsed;
@@ -202,9 +204,10 @@ namespace WPF_PAR.MVVM.ViewModels
         // =============================================================================
         // CONSTRUCTOR ACTUALIZADO (Recibe string, crea servicios)
         // =============================================================================
-        public ClientesViewModel(ReportesService reportesService, SucursalesService sucursalesService, ClientesLogicService logicService, CatalogoService catalogoService, IDialogService dialogService, INotificationService notificationService, FilterService filterService)
+        public ClientesViewModel(ReportesService reportesService, ClientesService clientesService, SucursalesService sucursalesService, ClientesLogicService logicService, CatalogoService catalogoService, IDialogService dialogService, INotificationService notificationService, FilterService filterService)
         {
             _reportesService = reportesService;
+            _clientesService = clientesService;
             _sucursalesService = sucursalesService;
             _logicService = logicService;
             _catalogoService = catalogoService;
@@ -222,7 +225,7 @@ namespace WPF_PAR.MVVM.ViewModels
             ImprimirReporteCommand = new RelayCommand(o => GenerarPdfCliente());
 
             VerDetalleCommand = new RelayCommand(param => {
-                if ( param is ClienteResumenModel cliente )
+                if ( param is ClienteAnalisisModel cliente )
                 {
                     ClienteSeleccionado = cliente;
                     EnModoDetalle = true;
@@ -267,24 +270,13 @@ namespace WPF_PAR.MVVM.ViewModels
             IsLoading = true;
             try
             {
-                string anioActualStr = AnioSeleccionado.ToString();
-                string anioAnteriorStr = ( AnioSeleccionado - 1 ).ToString();
-                string sucursalId = Filters.SucursalId.ToString();
+                _todosLosClientes = await _clientesService.ObtenerDatosBase(AnioSeleccionado, Filters.SucursalId);
 
-                var taskActual = _reportesService.ObtenerHistoricoAnualPorArticulo(anioActualStr, sucursalId);
-                var taskAnterior = _reportesService.ObtenerHistoricoAnualPorArticulo(anioAnteriorStr, sucursalId);
-
-                await Task.WhenAll(taskActual, taskAnterior);
-
-                // Procesamiento pesado en hilo secundario
-                _todosLosClientes = await Task.Run(() => _logicService.ProcesarClientes(taskActual.Result, taskAnterior.Result));
-
-                TotalClientesActivos = _todosLosClientes.Count(x => x.VentaAnualActual > 0);
-                TotalClientesInactivos = _todosLosClientes.Count(x => x.VentaAnualActual == 0 && x.VentaAnualAnterior > 0);
+                TotalClientesActivos = _todosLosClientes.Count(x => x.VentasMensualesActual.Sum() > 0);
+                TotalClientesInactivos = _todosLosClientes.Count(x => x.VentasMensualesActual.Sum() == 0 && x.VentasMensualesAnterior.Sum() > 0);
 
                 FiltrarTabla();
                 CalcularVisibilidadPeriodos();
-
                 ClienteSeleccionado = null;
                 SeriesGrafica = null;
                 _isInitialized = true;
@@ -302,19 +294,17 @@ namespace WPF_PAR.MVVM.ViewModels
         private async Task CargarProductosDinamicos()
         {
             if ( ClienteSeleccionado == null ) return;
-
             try
             {
-                var (inicio, fin) = ObtenerRangoFechas();
-
-                var todosProductos = await _reportesService.ObtenerVariacionProductosCliente(
+                // El Worker ya hizo la magia de las fechas, solo le pedimos el año
+                var todosProductos = await _clientesService.ObtenerVariacionProductos(
                     ClienteSeleccionado.Nombre,
-                    inicio,
-                    fin,
+                    AnioSeleccionado,
                     Filters.SucursalId);
 
-                var declive = todosProductos.Where(x => x.Diferencia < 0).OrderBy(x => x.Diferencia).Take(10).ToList();
-                var aumento = todosProductos.Where(x => x.Diferencia > 0).OrderByDescending(x => x.Diferencia).Take(10).ToList();
+                // Agrupamos el top 10 (El worker ya podría traer solo el Top 10 si así lo configuraste)
+                var declive = todosProductos.Where(x => ( x.VentaActual - x.VentaAnterior ) < 0).OrderBy(x => ( x.VentaActual - x.VentaAnterior )).Take(10).ToList();
+                var aumento = todosProductos.Where(x => ( x.VentaActual - x.VentaAnterior ) > 0).OrderByDescending(x => ( x.VentaActual - x.VentaAnterior )).Take(10).ToList();
 
                 ProductosEnDeclive = new ObservableCollection<ProductoAnalisisModel>(declive);
                 ProductosEnAumento = new ObservableCollection<ProductoAnalisisModel>(aumento);
@@ -322,10 +312,7 @@ namespace WPF_PAR.MVVM.ViewModels
                 OnPropertyChanged(nameof(ProductosEnDeclive));
                 OnPropertyChanged(nameof(ProductosEnAumento));
             }
-            catch ( Exception ex )
-            {
-                Debug.WriteLine("Error cargando productos: " + ex.Message);
-            }
+            catch ( Exception ex ) { Debug.WriteLine("Error cargando productos: " + ex.Message); }
         }
 
         private async void GenerarPdfCliente()
@@ -349,7 +336,7 @@ namespace WPF_PAR.MVVM.ViewModels
                 {
                     var fin = DateTime.Now;
                     var inicio = fin.AddYears(-1);
-                    var ventasRaw = await _reportesService.ObtenerVentasBrutasRango(sucId, inicio, fin);
+                    var ventasRaw = await _reportesService.ObtenerVentasRangoAsync(sucId, inicio, fin);
 
                     var movimientos = ventasRaw
                         .Where(x => x.Cliente == nombreCliente)
@@ -368,7 +355,7 @@ namespace WPF_PAR.MVVM.ViewModels
 
                     var exporter = new ExportService();
                     exporter.ExportarPdfCliente(
-                        _clienteSeleccionado, // Ojo: Acceso a variable de clase dentro de Task puede requerir Dispatcher si UI object, pero Model es seguro.
+                        _clienteSeleccionado, 
                         kpis,
                         movimientos,
                         listAumento,
@@ -409,24 +396,22 @@ namespace WPF_PAR.MVVM.ViewModels
             return (new DateTime(anio, 1, 1), new DateTime(anio, 12, 31));
         }
 
-        private async void CargarDetalleAdicional(ClienteResumenModel cliente)
+        private async void CargarDetalleAdicional(ClienteAnalisisModel cliente) // Ojo al cambio de tipo si aplica
         {
             if ( cliente == null ) return;
             IsLoading = true;
 
             try
             {
-                KpisDetalle = await _reportesService.ObtenerKpisCliente(cliente.Nombre, AnioSeleccionado, Filters.SucursalId);
+                // Usamos el servicio de clientes y le pasamos el nombre
+                KpisDetalle = await _clientesService.ObtenerKpisCliente(cliente.Nombre, AnioSeleccionado, Filters.SucursalId);
                 await CargarProductosDinamicos();
             }
             catch ( Exception ex )
             {
                 _dialogService.ShowMessage("Error", ex.Message);
             }
-            finally
-            {
-                IsLoading = false;
-            }
+            finally { IsLoading = false; }
         }
 
         // =============================================================================
@@ -451,20 +436,20 @@ namespace WPF_PAR.MVVM.ViewModels
 
         private void ActualizarGrafica()
         {
-            if ( ClienteSeleccionado == null || ClienteSeleccionado.HistoriaMensualActual == null )
+            if ( ClienteSeleccionado == null || ClienteSeleccionado.VentasMensualesActual == null )
             {
                 SeriesGrafica = null;
                 return;
             }
 
-            var historia = ClienteSeleccionado.HistoriaMensualActual;
+            var historia = ClienteSeleccionado.VentasMensualesActual;
             var valores = new List<decimal>();
             string[] etiquetas = null;
 
             switch ( ModoSeleccionado )
             {
                 case "Anual":
-                    valores = historia;
+                    valores = historia.ToList();
                     etiquetas = new[] { "ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SEP", "OCT", "NOV", "DIC" };
                     break;
                 case "Semestral":
@@ -512,14 +497,14 @@ namespace WPF_PAR.MVVM.ViewModels
 
             if ( string.IsNullOrWhiteSpace(TextoBusqueda) )
             {
-                ClientesResumen = new ObservableCollection<ClienteResumenModel>(_todosLosClientes);
+                ClientesResumen = new ObservableCollection<ClienteAnalisisModel>(_todosLosClientes);
             }
             else
             {
                 var filtrados = _todosLosClientes
                     .Where(x => x.Nombre.IndexOf(TextoBusqueda, StringComparison.OrdinalIgnoreCase) >= 0)
                     .ToList();
-                ClientesResumen = new ObservableCollection<ClienteResumenModel>(filtrados);
+                ClientesResumen = new ObservableCollection<ClienteAnalisisModel>(filtrados);
             }
         }
     }

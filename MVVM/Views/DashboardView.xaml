@@ -42,7 +42,6 @@
                     </StackPanel>
 
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-
                         <materialDesign:Card UniformCornerRadius="20" Padding="5" Margin="0,0,10,0" materialDesign:ElevationAssist.Elevation="Dp1">
                             <ComboBox ItemsSource="{Binding Periodos}" 
                                       SelectedItem="{Binding PeriodoSeleccionado}"
@@ -72,9 +71,11 @@
             <Grid Grid.Row="1" Margin="0,0,0,25">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="1.5*"/>
+                    <ColumnDefinition Width="1.2*"/>
                     <ColumnDefinition Width="1*"/>
                     <ColumnDefinition Width="1*"/>
                     <ColumnDefinition Width="1*"/>
+                    <ColumnDefinition Width="1.2*"/>
                 </Grid.ColumnDefinitions>
 
                 <materialDesign:Card Grid.Column="0" UniformCornerRadius="20" Margin="0,0,15,0" materialDesign:ElevationAssist.Elevation="Dp4" BorderThickness="0">
@@ -92,11 +93,10 @@
                         <StackPanel Margin="25" VerticalAlignment="Center">
                             <TextBlock Text="Ingresos Totales" Foreground="White" Opacity="0.8" FontSize="14" FontWeight="SemiBold"/>
                             <TextBlock Text="{Binding KpiVentas, StringFormat={}{0:C0}}" 
-                                       Foreground="White" FontSize="36" FontWeight="Bold" Margin="0,5,0,15"/>
+                                       Foreground="White" FontSize="32" FontWeight="Bold" Margin="0,5,0,15"/>
 
                             <Border Background="#30FFFFFF" CornerRadius="10" HorizontalAlignment="Left" Padding="10,4">
                                 <StackPanel Orientation="Horizontal">
-
                                     <materialDesign:PackIcon Width="15" Height="15" VerticalAlignment="Center" Foreground="White">
                                         <materialDesign:PackIcon.Style>
                                             <Style TargetType="materialDesign:PackIcon">
@@ -109,7 +109,6 @@
                                             </Style>
                                         </materialDesign:PackIcon.Style>
                                     </materialDesign:PackIcon>
-
                                     <TextBlock Text="{Binding TextoComparativo}" 
                                         Foreground="White" FontSize="11" FontWeight="Bold" Margin="5,0,0,0"/>
                                 </StackPanel>
@@ -118,26 +117,42 @@
                     </Grid>
                 </materialDesign:Card>
 
-                <materialDesign:Card Grid.Column="1" UniformCornerRadius="20" Margin="0,0,15,0" Padding="20">
+                <materialDesign:Card Grid.Column="1" UniformCornerRadius="20" Margin="0,0,15,0" Padding="15">
+                    <StackPanel VerticalAlignment="Center">
+                        <materialDesign:PackIcon Kind="HandCoin" Width="30" Height="30" Foreground="#4CAF50" Margin="0,0,0,10"/>
+                        <TextBlock Text="{Binding KpiUtilidad, StringFormat={}{0:C0}}" FontSize="24" FontWeight="Bold"/>
+                        <TextBlock Text="Utilidad Bruta" Opacity="0.5" FontSize="12" FontWeight="SemiBold"/>
+                    </StackPanel>
+                </materialDesign:Card>
+
+                <materialDesign:Card Grid.Column="2" UniformCornerRadius="20" Margin="0,0,15,0" Padding="15">
+                    <StackPanel VerticalAlignment="Center">
+                        <materialDesign:PackIcon Kind="PercentOutline" Width="30" Height="30" Foreground="#FFC107" Margin="0,0,0,10"/>
+                        <TextBlock Text="{Binding KpiMargen, StringFormat={}{0:P1}}" FontSize="24" FontWeight="Bold"/>
+                        <TextBlock Text="Margen" Opacity="0.5" FontSize="12" FontWeight="SemiBold"/>
+                    </StackPanel>
+                </materialDesign:Card>
+
+                <materialDesign:Card Grid.Column="3" UniformCornerRadius="20" Margin="0,0,15,0" Padding="15">
                     <StackPanel VerticalAlignment="Center">
                         <materialDesign:PackIcon Kind="ReceiptText" Width="30" Height="30" Foreground="Orange" Margin="0,0,0,10"/>
-                        <TextBlock Text="{Binding KpiTransacciones, StringFormat={}{0:N0}}" FontSize="28" FontWeight="Bold"/>
+                        <TextBlock Text="{Binding KpiTransacciones, StringFormat={}{0:N0}}" FontSize="24" FontWeight="Bold"/>
                         <TextBlock Text="Transacciones" Opacity="0.5" FontSize="12" FontWeight="SemiBold"/>
                     </StackPanel>
                 </materialDesign:Card>
 
-                <materialDesign:Card Grid.Column="2" UniformCornerRadius="20" Margin="0,0,15,0" Padding="20">
+                <materialDesign:Card Grid.Column="4" UniformCornerRadius="20" Margin="0,0,15,0" Padding="15">
                     <StackPanel VerticalAlignment="Center">
                         <materialDesign:PackIcon Kind="AccountGroup" Width="30" Height="30" Foreground="Teal" Margin="0,0,0,10"/>
-                        <TextBlock Text="{Binding KpiClientes, StringFormat={}{0:N0}}" FontSize="28" FontWeight="Bold"/>
-                        <TextBlock Text="Clientes Únicos" Opacity="0.5" FontSize="12" FontWeight="SemiBold"/>
+                        <TextBlock Text="{Binding KpiClientes, StringFormat={}{0:N0}}" FontSize="24" FontWeight="Bold"/>
+                        <TextBlock Text="Clientes" Opacity="0.5" FontSize="12" FontWeight="SemiBold"/>
                     </StackPanel>
                 </materialDesign:Card>
 
-                <materialDesign:Card Grid.Column="3" UniformCornerRadius="20" Padding="20">
+                <materialDesign:Card Grid.Column="5" UniformCornerRadius="20" Padding="15">
                     <StackPanel VerticalAlignment="Center">
                         <materialDesign:PackIcon Kind="ChartDonut" Width="30" Height="30" Foreground="#E91E63" Margin="0,0,0,10"/>
-                        <TextBlock Text="{Binding KpiLitros, StringFormat={}{0:N0} L}" FontSize="28" FontWeight="Bold"/>
+                        <TextBlock Text="{Binding KpiLitros, StringFormat={}{0:N0} L}" FontSize="24" FontWeight="Bold"/>
                         <TextBlock Text="Litros totales" Opacity="0.5" FontSize="12" FontWeight="SemiBold"/>
                     </StackPanel>
                 </materialDesign:Card>

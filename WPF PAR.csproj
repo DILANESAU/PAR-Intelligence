@@ -54,6 +54,8 @@
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.3" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.3" />
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.3" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.3" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
     <PackageReference Include="QuestPDF" Version="2025.12.3" />
     <PackageReference Include="SkiaSharp" Version="3.119.2-preview.1" />
     <PackageReference Include="SkiaSharp.Views.WPF" Version="3.119.2-preview.1" />

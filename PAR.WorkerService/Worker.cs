@@ -6,6 +6,7 @@ using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Collections.Generic;
 
 using WPF_PAR.Core.Services; // Acceso al Core
 using WPF_PAR.Core.Models;   // Acceso a modelos
@@ -33,44 +34,38 @@ namespace PAR.WorkerService
 
                 try
                 {
-                    // 1. LEER CONFIGURACIÓN (Desde appsettings.json)
-                    // Asegúrate que en appsettings.json tengas: 
-                    // "ConnectionStrings": { "Intelisis": "...", "ParSystem": "..." }
-                    string connIntelisis = _configuration.GetConnectionString("Intelisis");
-                    string connPar = _configuration.GetConnectionString("ParSystem");
-
-                    // Asegúrate que en appsettings.json tengas: "Config": { "SucursalesIds": [1, 2, 3] }
+                    string? connIntelisis = _configuration.GetConnectionString("Intelisis");
+                    string? connPar = _configuration.GetConnectionString("ParSystem");
                     var sucursales = _configuration.GetSection("Config:SucursalesIds").Get<int[]>();
 
                     if ( string.IsNullOrEmpty(connIntelisis) || string.IsNullOrEmpty(connPar) )
                     {
-                        _logger.LogError("❌ No se encontraron las cadenas de conexión en appsettings.json.");
+                        _logger.LogError("❌ Faltan las cadenas de conexión en appsettings.json.");
                         await Task.Delay(5000, stoppingToken);
                         continue;
                     }
 
-                    // 2. INSTANCIAR SERVICIOS (Inyección Manual)
-                    // Creamos BusinessLogic primero porque FamiliaLogic lo necesita
+                    // 1. INSTANCIAMOS LOS SERVICIOS
                     var businessLogic = new BusinessLogicService();
-
-                    var reportesService = new ReportesService(connIntelisis);
-                    var clientesService = new ClientesService(connIntelisis);
                     var familiaLogic = new FamiliaLogicService(businessLogic);
+                    var catalogoService = new CatalogoService(businessLogic);
 
-                    // CacheService usa la base intermedia (PAR System)
-                    var cacheService = new CacheService(connPar);
+                    // EL MINERO (Va a Intelisis)
+                    var intelisis = new IntelisisDataService(connIntelisis);
 
-                    // 3. PROCESAR CADA SUCURSAL
+                    // EL BODEGUERO (Guarda en Mini PC)
+                    var cache = new CacheService(connPar);
+
                     if ( sucursales != null && sucursales.Length > 0 )
                     {
                         foreach ( var sucId in sucursales )
                         {
-                            await ProcesarSucursal(sucId, reportesService, clientesService, familiaLogic, cacheService);
+                            await ProcesarSucursal(sucId, intelisis, familiaLogic, catalogoService, cache);
                         }
                     }
                     else
                     {
-                        _logger.LogWarning("⚠️ No hay sucursales configuradas en 'Config:SucursalesIds'.");
+                        _logger.LogWarning("⚠️ No hay sucursales configuradas.");
                     }
 
                     _logger.LogInformation("✅ Ciclo terminado con éxito.");
@@ -80,72 +75,97 @@ namespace PAR.WorkerService
                     _logger.LogError(ex, "❌ Error crítico en el ciclo del Worker");
                 }
 
-                // Esperar N minutos antes de la siguiente vuelta
-                int minutosEspera = _configuration.GetValue<int>("Config:IntervaloMinutos", 10); // Default 10 min
+                int minutosEspera = _configuration.GetValue<int>("Config:IntervaloMinutos", 10);
                 await Task.Delay(TimeSpan.FromMinutes(minutosEspera), stoppingToken);
             }
         }
 
         private async Task ProcesarSucursal(
             int sucId,
-            ReportesService reportes,
-            ClientesService clientes,
+            IntelisisDataService intelisis,
             FamiliaLogicService familiaLogic,
+            CatalogoService catalogoService,
             CacheService cache)
         {
             _logger.LogInformation($"   > Procesando Sucursal {sucId}...");
 
             try
             {
+                var anioActual = DateTime.Now.Year;
+                var mesActual = DateTime.Now.Month;
+                var inicioMes = new DateTime(anioActual, mesActual, 1);
+
                 // ========================================================
-                // A. FAMILIAS (Ventas por Familia)
+                // A. FAMILIAS Y VENTAS MENSUALES
                 // ========================================================
-                var inicioMes = new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1);
+                var ventasRaw = await intelisis.ObtenerVentasRangoAsync(sucId, inicioMes, DateTime.Now);
 
-                // 1. Traer datos crudos de Intelisis
-                var ventasRaw = await reportes.ObtenerVentasBrutasRango(sucId, inicioMes, DateTime.Now);
-
-                // 2. Aplicar lógica de negocio
-                // NOTA: Asegúrate que VentaReporteModel tenga las propiedades Familia/Linea llenas.
-                // Si vienen vacías de SQL, necesitas llenarlas aquí usando CatalogoService o similar.
-                // Como FamiliaLogicService asume que ya tienen familia, quizás necesites un CatalogoService aquí también.
-
-                // --- INICIO PARCHE CATÁLOGO ---
-                // Si tus ventasRaw no traen Familia/Linea desde el SQL, descomenta esto:
-                /*
-                var catalogo = new CatalogoService(new BusinessLogicService());
-                foreach(var v in ventasRaw) {
-                    var info = catalogo.ObtenerInfo(v.Articulo);
+                foreach ( var v in ventasRaw )
+                {
+                    var info = catalogoService.ObtenerInfo(v.Articulo);
                     v.Familia = info.FamiliaSimple;
                     v.Linea = info.Linea;
+                    v.Descripcion = info.Descripcion;
+                    v.LitrosUnitarios = info.Litros;
                 }
-                */
-                // --- FIN PARCHE CATÁLOGO ---
+
+                // Filtrar Ferretería
+                ventasRaw = ventasRaw.Where(x => x.Familia != "FERRETERIA" && !x.Linea.Contains("FERRETERIA", StringComparison.OrdinalIgnoreCase)).ToList();
 
                 var (arqui, espe) = familiaLogic.CalcularResumenGlobal(ventasRaw);
                 var todasFamilias = arqui.Concat(espe).ToList();
 
-                // 3. Guardar en Cache (Base intermedia)
-                // Asegúrate que CacheService tenga este método implementado
-                // await cache.GuardarFamiliasAsync(sucId, todasFamilias);
-                _logger.LogInformation($"     - Familias procesadas ({todasFamilias.Count} registros)");
+                await cache.GuardarFamiliasAsync(sucId, todasFamilias);
+                await cache.GuardarVentasDetalleAsync(sucId, ventasRaw);
+                _logger.LogInformation($"     - Familias y Ventas guardadas ({ventasRaw.Count} items).");
 
                 // ========================================================
-                // B. CLIENTES (Top Clientes)
+                // B. HISTÓRICO ANUAL
                 // ========================================================
+                var historicoRaw = await intelisis.ObtenerHistoricoAnualPorArticulo(anioActual.ToString(), sucId.ToString());
 
-                // NOTA: ClientesService.ObtenerTopClientes NO EXISTE en el código que revisamos antes.
-                // Tienes ObtenerDatosBase o ObtenerKpisCliente.
-                // Debes implementar ObtenerTopClientes en ClientesService o usar una lógica aquí.
+                foreach ( var item in historicoRaw )
+                {
+                    var info = catalogoService.ObtenerInfo(item.Articulo);
+                    item.Familia = info.FamiliaSimple;
+                    item.Linea = info.Linea;
+                }
 
-                // Ejemplo Simulado:
-                /*
-                var topClientes = await clientes.ObtenerDatosBase(DateTime.Now.Year, sucId); 
-                // Filtrar o procesar topClientes si es necesario...
-                await cache.GuardarClientesAsync(sucId, topClientes);
-                */
+                await cache.GuardarHistoricoAnualAsync(sucId, anioActual, historicoRaw);
+                _logger.LogInformation($"     - Histórico Anual guardado.");
 
-                _logger.LogInformation($"     - Clientes procesados.");
+                // ========================================================
+                // C. DASHBOARD TENDENCIA
+                // ========================================================
+                // Nota: Asumo que en tu viejo servicio tenías un parámetro bool agruparPorMes
+                var tendenciaMes = await intelisis.ObtenerTendenciaGrafica(sucId, inicioMes, DateTime.Now, agruparPorMes: false);
+                await cache.GuardarDashboardAsync(sucId, tendenciaMes);
+                _logger.LogInformation($"     - Tendencia Dashboard guardada.");
+
+                // ========================================================
+                // D. CLIENTES
+                // ========================================================
+                var clientesBase = await intelisis.ObtenerDatosBaseClientes(anioActual, sucId); // <-- Cambié el nombre al que le pusiste en tu clase
+                await cache.GuardarClientesBaseAsync(sucId, anioActual, clientesBase);
+                _logger.LogInformation($"     - Top Clientes guardado ({clientesBase.Count} clientes).");
+
+                // Fechas para la variación (Ej. del 1 de enero al día de hoy)
+                DateTime fechaInicioVariacion = new DateTime(anioActual, 1, 1);
+                DateTime fechaFinVariacion = DateTime.Now;
+
+                var topClientes = clientesBase.Take(10).ToList();
+                foreach ( var cliente in topClientes )
+                {
+                    if ( string.IsNullOrEmpty(cliente.Cliente) ) continue;
+
+                    var kpi = await intelisis.ObtenerKpisCliente(cliente.Nombre, anioActual, sucId); // OJO: Tu query usa c.Nombre = @NombreCliente
+
+                    // AHORA SÍ LE PASAMOS LOS DATETIME
+                    var variacion = await intelisis.ObtenerVariacionProductos(cliente.Nombre, fechaInicioVariacion, fechaFinVariacion, sucId);
+
+                    await cache.GuardarClienteDetalleAsync(sucId, anioActual, cliente.Cliente, kpi, variacion);
+                }
+                _logger.LogInformation($"     - Detalle de KPIs y Variaciones del Top 10 guardado.");
             }
             catch ( Exception ex )
             {

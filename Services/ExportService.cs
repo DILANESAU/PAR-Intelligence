@@ -8,6 +8,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq; // Agregado para usar .Sum()
 
 using WPF_PAR.Core.Models;
 
@@ -78,11 +79,11 @@ namespace WPF_PAR.Services
         // ========================================================================
         // Método Mejorado con TODA la información
         public void ExportarPdfCliente(
-            ClienteResumenModel cliente,
+            ClienteAnalisisModel cliente, // <--- ¡CAMBIO AQUÍ! Ahora es ClienteAnalisisModel
             KpiClienteModel kpis,
             List<VentaReporteModel> movimientos,
-            List<ProductoAnalisisModel> topAumento,  // <--- NUEVO
-            List<ProductoAnalisisModel> topDeclive,  // <--- NUEVO
+            List<ProductoAnalisisModel> topAumento,
+            List<ProductoAnalisisModel> topDeclive,
             string rutaArchivo)
         {
             Document.Create(container =>
@@ -114,7 +115,10 @@ namespace WPF_PAR.Services
                         // 1. SECCIÓN DE KPIs (Resaltados)
                         col.Item().Row(row =>
                         {
-                            row.RelativeItem().Component(new KpiComponent("Venta Anual", $"{cliente.VentaAnualActual:C2}"));
+                            // ¡CAMBIO AQUÍ! Usamos la suma de VentasMensualesActual en lugar de VentaAnualActual
+                            decimal ventaAnualTotal = cliente.VentasMensualesActual?.Sum() ?? 0;
+                            row.RelativeItem().Component(new KpiComponent("Venta Anual", $"{ventaAnualTotal:C2}"));
+
                             row.RelativeItem().Component(new KpiComponent("Ticket Promedio", $"{kpis.TicketPromedio:C2}"));
                             row.RelativeItem().Component(new KpiComponent("Frecuencia", $"{kpis.FrecuenciaCompra} Facturas"));
                             row.RelativeItem().Component(new KpiComponent("Última Compra", $"{kpis.UltimaCompra:dd/MMM/yyyy}"));
@@ -137,7 +141,9 @@ namespace WPF_PAR.Services
                                     foreach ( var p in topDeclive.Take(5) )
                                     {
                                         table.Cell().Text(p.Descripcion).FontSize(9);
-                                        table.Cell().AlignRight().Text($"{p.Diferencia:C0}").FontColor(Colors.Red.Medium).FontSize(9);
+                                        // ¡CAMBIO AQUÍ! Calculamos la diferencia
+                                        decimal dif = p.VentaActual - p.VentaAnterior;
+                                        table.Cell().AlignRight().Text($"{dif:C0}").FontColor(Colors.Red.Medium).FontSize(9);
                                     }
                                 });
                             });
@@ -154,7 +160,9 @@ namespace WPF_PAR.Services
                                     foreach ( var p in topAumento.Take(5) )
                                     {
                                         table.Cell().Text(p.Descripcion).FontSize(9);
-                                        table.Cell().AlignRight().Text($"+{p.Diferencia:C0}").FontColor(Colors.Green.Medium).FontSize(9);
+                                        // ¡CAMBIO AQUÍ! Calculamos la diferencia
+                                        decimal dif = p.VentaActual - p.VentaAnterior;
+                                        table.Cell().AlignRight().Text($"+{dif:C0}").FontColor(Colors.Green.Medium).FontSize(9);
                                     }
                                 });
                             });

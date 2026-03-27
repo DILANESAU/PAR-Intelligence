@@ -1,8 +1,11 @@
 ﻿using LiveChartsCore;
 using LiveChartsCore.SkiaSharpView;
 using LiveChartsCore.SkiaSharpView.Painting;
+
 using MaterialDesignThemes.Wpf;
+
 using SkiaSharp;
+
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -14,7 +17,7 @@ using System.Windows.Media;
 using WPF_PAR.Converters;
 using WPF_PAR.Core.Models;
 using WPF_PAR.Core.Services;
-using WPF_PAR.Services; 
+using WPF_PAR.Services;
 using WPF_PAR.Services.Interfaces;
 
 namespace WPF_PAR.MVVM.ViewModels
@@ -23,10 +26,10 @@ namespace WPF_PAR.MVVM.ViewModels
     {
         private readonly ReportesService _reporteServices;
         private readonly SucursalesService _sucursalesService;
-        
+
         private readonly IDialogService _dialogService;
         private readonly INotificationService _notificationService;
-        
+
         public FilterService Filters { get; }
         public ISnackbarMessageQueue ErrorMessageQueue { get; set; }
 
@@ -46,9 +49,15 @@ namespace WPF_PAR.MVVM.ViewModels
             {
                 _periodoSeleccionado = value;
                 OnPropertyChanged();
-                if (!_isLoading) CargarDatos();
+                if ( !_isLoading ) CargarDatos();
             }
         }
+
+        private decimal _kpiUtilidad;
+        public decimal KpiUtilidad { get => _kpiUtilidad; set { _kpiUtilidad = value; OnPropertyChanged(); } }
+
+        private decimal _kpiMargen;
+        public decimal KpiMargen { get => _kpiMargen; set { _kpiMargen = value; OnPropertyChanged(); } }
 
         public ObservableCollection<SucursalModel> Sucursales { get; set; }
 
@@ -58,18 +67,18 @@ namespace WPF_PAR.MVVM.ViewModels
             get => _sucursalSeleccionada;
             set
             {
-                if (_sucursalSeleccionada != value)
+                if ( _sucursalSeleccionada != value )
                 {
                     _sucursalSeleccionada = value;
                     OnPropertyChanged();
 
-                    if (value != null)
+                    if ( value != null )
                     {
                         Filters.SucursalId = value.Id;
-                        _notificationService.ShowInfo($"Cambiando a: {value.Nombre}..."); 
+                        _notificationService.ShowInfo($"Cambiando a: {value.Nombre}...");
                     }
 
-                    if (!_isLoading) CargarDatos();
+                    if ( !_isLoading ) CargarDatos();
                 }
             }
         }
@@ -104,9 +113,9 @@ namespace WPF_PAR.MVVM.ViewModels
 
         private bool _isLoading;
         public bool IsLoading { get => _isLoading; set { _isLoading = value; OnPropertyChanged(); } }
+
         public DashboardViewModel(ReportesService reporteServices, SucursalesService sucursalesService, IDialogService dialogService, INotificationService notificationService, FilterService filterService)
         {
-            // Ya no hacemos "new", usamos lo que nos inyecta el App.xaml.cs
             _reporteServices = reporteServices;
             _sucursalesService = sucursalesService;
             _dialogService = dialogService;
@@ -134,15 +143,15 @@ namespace WPF_PAR.MVVM.ViewModels
 
         public void CargarDatosIniciales()
         {
-            if (Sucursales.Count == 0)
+            if ( Sucursales.Count == 0 )
             {
                 Sucursales.Clear();
                 Sucursales.Add(new SucursalModel { Id = 0, Nombre = "0 - TODAS - Resumen Global" });
 
                 var diccionario = _sucursalesService.CargarSucursales();
-                if (diccionario != null)
+                if ( diccionario != null )
                 {
-                    foreach (var item in diccionario)
+                    foreach ( var item in diccionario )
                     {
                         Sucursales.Add(new SucursalModel { Id = item.Key, Nombre = $"{item.Key} - {item.Value}" });
                     }
@@ -156,94 +165,65 @@ namespace WPF_PAR.MVVM.ViewModels
 
         public async void CargarDatos()
         {
-            if (IsLoading) return;
+            if ( IsLoading ) return;
             IsLoading = true;
-            _notificationService.ShowInfo("Cargando datos del dashboard...");
+            _notificationService.ShowInfo("Leyendo caché del dashboard...");
 
             try
             {
+                int sucursalId = SucursalSeleccionada?.Id ?? 0;
+
+                // 1. Calcular fechas según el combobox
                 DateTime fechaInicio = DateTime.Now.Date;
                 DateTime fechaFin = DateTime.Now.Date;
-                DateTime fechaInicioAnt = DateTime.Now.Date;
-                DateTime fechaFinAnt = DateTime.Now.Date;
+                bool agruparPorMes = false;
 
-                switch (PeriodoSeleccionado)
+                switch ( PeriodoSeleccionado )
                 {
                     case "Esta Semana":
-                        int diff = (7 + (DateTime.Now.DayOfWeek - DayOfWeek.Monday)) % 7;
+                        int diff = ( 7 + ( DateTime.Now.DayOfWeek - DayOfWeek.Monday ) ) % 7;
                         fechaInicio = DateTime.Now.AddDays(-1 * diff).Date;
-                        fechaFin = DateTime.Now.Date;
-                        fechaInicioAnt = fechaInicio.AddDays(-7);
-                        fechaFinAnt = fechaFin.AddDays(-7);
                         break;
                     case "Este Mes":
                         fechaInicio = new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1);
-                        fechaInicioAnt = fechaInicio.AddMonths(-1);
-                        fechaFinAnt = fechaInicio.AddDays(-1);
                         break;
                     case "Este Año":
                         fechaInicio = new DateTime(DateTime.Now.Year, 1, 1);
-                        fechaInicioAnt = fechaInicio.AddYears(-1);
-                        fechaFinAnt = new DateTime(fechaInicio.Year - 1, 12, 31);
-                        break;
-                    default:
-                        fechaInicio = DateTime.Today;
+                        fechaFin = new DateTime(DateTime.Now.Year, 12, 31);
+                        agruparPorMes = true;
                         break;
                 }
 
-                int sucursalId = SucursalSeleccionada?.Id ?? 0;
-                bool agruparPorMes = PeriodoSeleccionado == "Este Año";
+                // 2. Leer del caché
+                var datosGrafico = await _reporteServices.ObtenerTendenciaGrafica(sucursalId, fechaInicio, fechaFin, agruparPorMes);
+                var datosActuales = await _reporteServices.ObtenerVentasDetalleAsync(sucursalId);
 
-                var taskActual = _reporteServices.ObtenerVentasRangoAsync(sucursalId, fechaInicio, fechaFin);
-                var taskAnterior = _reporteServices.ObtenerVentasRangoAsync(sucursalId, fechaInicioAnt, fechaFinAnt);
-                var taskGrafico = _reporteServices.ObtenerTendenciaGrafica(sucursalId, fechaInicio, fechaFin, agruparPorMes);
-
-                await Task.WhenAll(taskActual, taskAnterior, taskGrafico);
-
-                var datosActuales = taskActual.Result;
-                var datosAnteriores = taskAnterior.Result;
-                var datosGrafico = taskGrafico.Result;
-
-                decimal ventaActual = datosActuales.Sum(x => x.TotalVenta);
-                decimal ventaAnterior = datosAnteriores.Sum(x => x.TotalVenta);
-
-                KpiVentas = ventaActual;
-                KpiLitros = (decimal)datosActuales.Sum(x => x.LitrosTotal);
-
-                if (ventaAnterior == 0)
-                {
-                    TextoComparativo = "Sin datos anteriores";
-                    EsCrecimientoPositivo = true;
-                }
-                else
-                {
-                    decimal diferencia = ventaActual - ventaAnterior;
-                    decimal porcentaje = (diferencia / ventaAnterior) * 100;
-                    EsCrecimientoPositivo = porcentaje >= 0;
-                    string signo = EsCrecimientoPositivo ? "+" : "";
-                    TextoComparativo = $"{signo}{porcentaje:N1}% vs periodo anterior";
-                }
+                // 3. Llenar KPIs
+                KpiVentas = datosActuales.Sum(x => x.TotalVenta);
+                KpiLitros = ( decimal ) datosActuales.Sum(x => x.LitrosTotales);
+                KpiUtilidad = datosActuales.Sum(x => x.UtilidadBruta);
+                KpiMargen = KpiVentas > 0 ? ( KpiUtilidad / KpiVentas ) : 0;
 
                 ListaVentas.Clear();
-                foreach (var item in datosActuales) ListaVentas.Add(item);
+                foreach ( var item in datosActuales ) ListaVentas.Add(item);
 
                 ProcesarDatosResumen(datosActuales);
+
+                // 4. Dibujar gráfica con relleno de ceros
                 ConfigurarGraficoDinamico(datosGrafico, fechaInicio, fechaFin, PeriodoSeleccionado);
 
-                if (datosActuales.Count == 0)
+                if ( datosActuales.Count == 0 )
                 {
-                    string nombreSucursal = SucursalSeleccionada?.Nombre.Split('-')[1].Trim() ?? "la sucursal";
-                    _notificationService.ShowInfo($"No hay movimientos en {nombreSucursal} para {PeriodoSeleccionado.ToLower()}.");
+                    _notificationService.ShowInfo($"El caché para esta sucursal aún no ha sido procesado por el Worker.");
                 }
             }
-            catch (Exception ex)
+            catch ( Exception ex )
             {
-                _notificationService.ShowError($"Error al cargar dashboard: {ex.Message}");
+                _notificationService.ShowError($"Error al leer caché: {ex.Message}");
             }
             finally
             {
                 IsLoading = false;
-                _notificationService.ShowSuccess("Datos del dashboard actualizados.");
             }
         }
 
@@ -254,22 +234,26 @@ namespace WPF_PAR.MVVM.ViewModels
 
             bool isDark = false;
             try { isDark = Properties.Settings.Default.IsDarkMode; } catch { }
-            var colorTexto = isDark ? SKColors.White : SKColors.DarkKhaki;
+
+            var colorTexto = isDark ? SKColors.White : SKColors.DarkSlateGray;
             var colorSeparador = isDark ? SKColors.White.WithAlpha(30) : SKColors.Gray.WithAlpha(30);
 
-            if (periodoTipo == "Este Año")
+            if ( datos == null ) datos = new List<GraficoPuntoModel>();
+
+            // Magia de relleno de ceros
+            if ( periodoTipo == "Este Año" )
             {
                 var nombresMeses = new[] { "Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic" };
-                for (int i = 1; i <= 12; i++)
+                for ( int i = 1; i <= 12; i++ )
                 {
                     var dato = datos.FirstOrDefault(x => x.Indice == i);
                     valores.Add(dato?.Total ?? 0);
                     etiquetas.Add(nombresMeses[i - 1]);
                 }
             }
-            else if (periodoTipo == "Esta Semana")
+            else if ( periodoTipo == "Esta Semana" )
             {
-                for (int i = 0; i < 7; i++)
+                for ( int i = 0; i < 7; i++ )
                 {
                     DateTime diaActualLoop = inicio.AddDays(i);
                     var dato = datos.FirstOrDefault(x => x.Indice == diaActualLoop.Day);
@@ -277,10 +261,10 @@ namespace WPF_PAR.MVVM.ViewModels
                     etiquetas.Add(diaActualLoop.ToString("ddd"));
                 }
             }
-            else
+            else // Este Mes
             {
                 int diasEnMes = DateTime.DaysInMonth(inicio.Year, inicio.Month);
-                for (int i = 1; i <= diasEnMes; i++)
+                for ( int i = 1; i <= diasEnMes; i++ )
                 {
                     var dato = datos.FirstOrDefault(x => x.Indice == i);
                     valores.Add(dato?.Total ?? 0);
@@ -302,13 +286,17 @@ namespace WPF_PAR.MVVM.ViewModels
                 }
             };
 
-            EjeX = new Axis[] { new Axis { Labels = etiquetas, LabelsPaint = new SolidColorPaint(colorTexto), TextSize = 12 } };
+            EjeX = new Axis[] { new Axis { Labels = etiquetas.ToArray(), LabelsPaint = new SolidColorPaint(colorTexto), TextSize = 12 } };
             EjeY = new Axis[] { new Axis { Labeler = v => $"{v:C0}", LabelsPaint = new SolidColorPaint(colorTexto), TextSize = 12, SeparatorsPaint = new SolidColorPaint(colorSeparador) } };
+
+            OnPropertyChanged(nameof(SeriesVentas));
+            OnPropertyChanged(nameof(EjeX));
+            OnPropertyChanged(nameof(EjeY));
         }
 
         private void ProcesarDatosResumen(List<VentaReporteModel> datos)
         {
-            if (datos == null || !datos.Any())
+            if ( datos == null || !datos.Any() )
             {
                 KpiVentas = 0; KpiTransacciones = 0; KpiClientes = 0;
                 TopProductosList.Clear();
@@ -330,7 +318,7 @@ namespace WPF_PAR.MVVM.ViewModels
                 .OrderByDescending(x => x.Monto)
                 .Take(5)
                 .ToList();
-            for (int i = 0; i < topClientes.Count; i++) topClientes[i].Ranking = i + 1;
+            for ( int i = 0; i < topClientes.Count; i++ ) topClientes[i].Ranking = i + 1;
             TopProductosList = new ObservableCollection<TopProductoItem>(topClientes);
 
             var ultimos = datos
@@ -350,14 +338,14 @@ namespace WPF_PAR.MVVM.ViewModels
 
         private string ObtenerIniciales(string nombre)
         {
-            if (string.IsNullOrWhiteSpace(nombre)) return "?";
+            if ( string.IsNullOrWhiteSpace(nombre) ) return "?";
             var partes = nombre.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-            if (partes.Length == 0) return "?";
-            if (partes.Length == 1) return partes[0].Substring(0, Math.Min(2, partes[0].Length)).ToUpper();
-            return (partes[0][0].ToString() + partes[1][0].ToString()).ToUpper();
+            if ( partes.Length == 0 ) return "?";
+            if ( partes.Length == 1 ) return partes[0].Substring(0, Math.Min(2, partes[0].Length)).ToUpper();
+            return ( partes[0][0].ToString() + partes[1][0].ToString() ).ToUpper();
         }
     }
+
     public class TopProductoItem { public int Ranking { get; set; } public string Nombre { get; set; } public decimal Monto { get; set; } }
     public class ClienteRecienteItem { public string Iniciales { get; set; } public string Nombre { get; set; } public DateTime Fecha { get; set; } }
-
 }

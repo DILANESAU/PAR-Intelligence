@@ -3,9 +3,9 @@ using System.Windows;
 using System.Windows.Controls;
 
 // Usings necesarios
-using WPF_PAR.Converters;
-using WPF_PAR.Services;      // Si AuthService está aquí
-// using WPF_PAR.Core.Services; // O aquí, revisa dónde vive AuthService
+using WPF_PAR.Converters;    // Si AuthService está aquí
+ using WPF_PAR.Core.Services;
+using WPF_PAR.Services;
 
 namespace WPF_PAR.MVVM.ViewModels
 {
@@ -42,10 +42,10 @@ namespace WPF_PAR.MVVM.ViewModels
         public RelayCommand ExitCommand { get; set; }
 
         // CONSTRUCTOR ACTUALIZADO: Recibe string connectionString
-        public LoginViewModel(string connectionString)
+        public LoginViewModel(AuthService authService)
         {
-            // Creamos el servicio de autenticación con la conexión
-            _authService = new AuthService(connectionString);
+            // Asignamos el servicio que nos mandó App.xaml.cs
+            _authService = authService;
 
             LoginCommand = new RelayCommand(async param =>
             {
@@ -81,7 +81,7 @@ namespace WPF_PAR.MVVM.ViewModels
 
                         if ( Application.Current is App app )
                         {
-                            app.AbrirMainWindow(); // <--- Asegúrate de tener este método en App.xaml.cs
+                            app.AbrirMainWindow(); // <--- Abre el Dashboard
                         }
 
                         // Cerrar ventana actual (Login)

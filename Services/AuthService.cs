@@ -20,27 +20,28 @@ namespace WPF_PAR.Services
 
         public async Task<UsuarioModel> ValidarLoginAsync(string usuarioInput, string passwordInput)
         {
-            // 1. Buscamos al usuario
-            // Usamos AS Username para que Dapper lo mapee automático a la propiedad Username
+            // 1. Buscamos al usuario HACIENDO JOIN CON ROLES
+            // Traemos el Nombre del Rol para poder validarlo después
             string query = @"
-                SELECT 
-                    IdUsuario,
-                    [user] AS Username, 
-                    NombreCompleto, 
-                    Correo,
-                    Rol
-                FROM Usuarios 
-                WHERE [user] = @User AND Clave = @Pass";
+        SELECT 
+            u.IdUsuario,
+            u.[user] AS Username, 
+            u.NombreCompleto, 
+            u.Correo,
+            u.IdRol,
+            r.Nombre AS Rol -- Traemos el texto 'Admin', 'Director', etc.
+        FROM Usuarios u
+        INNER JOIN Roles r ON u.IdRol = r.IdRol
+        WHERE u.[user] = @User AND u.Clave = @Pass AND u.Activo = 1";
 
             var parametros = new { User = usuarioInput, Pass = passwordInput };
 
-            // QueryAsync<T> hace el mapeo por nosotros
             var usuarios = await _authSqlHelper.QueryAsync<UsuarioModel>(query, parametros);
             var usuarioEncontrado = usuarios.FirstOrDefault();
 
             if ( usuarioEncontrado == null ) return null;
 
-            // 2. Lógica de Permisos
+            // 2. Lógica de Permisos (Ahora 'Rol' ya tiene el texto gracias al JOIN)
             if ( usuarioEncontrado.Rol.Equals("Admin", StringComparison.OrdinalIgnoreCase) ||
                 usuarioEncontrado.Rol.Equals("Director", StringComparison.OrdinalIgnoreCase) )
             {
@@ -49,18 +50,14 @@ namespace WPF_PAR.Services
             else
             {
                 string queryPermisos = @"
-                    SELECT IdSucursal 
-                    FROM UsuarioSucursales
-                    WHERE IdUsuario = @Id";
+            SELECT IdSucursal 
+            FROM UsuarioSucursales
+            WHERE IdUsuario = @Id";
 
                 var paramsPermisos = new { Id = usuarioEncontrado.IdUsuario };
-
-                // Traemos la lista de IDs directamente como una lista de int
                 var listaIds = await _authSqlHelper.QueryAsync<int>(queryPermisos, paramsPermisos);
 
-                usuarioEncontrado.SucursalesPermitidas = listaIds.Any()
-                    ? listaIds
-                    : new List<int>();
+                usuarioEncontrado.SucursalesPermitidas = listaIds.ToList();
             }
 
             return usuarioEncontrado;
