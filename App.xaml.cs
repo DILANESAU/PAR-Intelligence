@@ -10,6 +10,7 @@ using WPF_PAR.Services;
 using WPF_PAR.Services.Interfaces;
 using WPF_PAR.Core.Services;
 using WPF_PAR.Core.Models;
+using WPF_PAR.Core.Services.Interfaces;
 
 namespace WPF_PAR
 {
@@ -32,8 +33,9 @@ namespace WPF_PAR
             services.AddSingleton<ThemeService>();
             services.AddSingleton<INotificationService, NotificationService>();
             services.AddSingleton<IDialogService, DialogService>();
-            services.AddSingleton<BusinessLogicService>();
             services.AddSingleton<SecureStorageService>();
+            services.AddSingleton<IBusinessLogicService, BusinessLogicService>();
+            services.AddSingleton<IClientesLogicService, ClientesLogicService>();
 
             // =========================================================================
             // 2. CORE SERVICES (Injecting Connection Strings) 💉
@@ -74,7 +76,7 @@ namespace WPF_PAR
             // 3. LOGIC SERVICES (Pure Logic from Core - No SQL needed)
             // =========================================================================
             services.AddTransient<FamiliaLogicService>();
-            services.AddTransient<ClientesLogicService>();
+            //services.AddTransient<ClientesLogicService>();
             services.AddTransient<ChartService>();
             services.AddTransient<CatalogoService>();
             services.AddTransient<ExportService>();

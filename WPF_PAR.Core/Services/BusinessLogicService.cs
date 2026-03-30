@@ -3,10 +3,11 @@ using System.Collections.Generic;
 using System.Text;
 
 using WPF_PAR.Core.Models;
+using WPF_PAR.Core.Services.Interfaces;
 
 namespace WPF_PAR.Core.Services
 {
-    public class BusinessLogicService
+    public class BusinessLogicService : IBusinessLogicService
     {
         private readonly List<FamiliaConfig> _configuraciones;
 
