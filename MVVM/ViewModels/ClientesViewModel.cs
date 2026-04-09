@@ -14,12 +14,13 @@ using System.Windows;
 
 // 1. Apuntamos al Core para Modelos y Servicios de Datos
 using WPF_PAR.Core.Models;
-using WPF_PAR.Core.Services;
+using WPF_PAR.Core.Services.Interfaces;
 
 // 2. Apuntamos a los servicios propios de la UI (Dialogos, Notificaciones)
 using WPF_PAR.Services;
 using WPF_PAR.Services.Interfaces;
-using WPF_PAR.Converters; // Si usas ObservableObject desde aquí
+using WPF_PAR.Converters;
+using WPF_PAR.Core.Services; // Si usas ObservableObject desde aquí
 
 namespace WPF_PAR.MVVM.ViewModels
 {
@@ -27,7 +28,7 @@ namespace WPF_PAR.MVVM.ViewModels
     {
         // --- SERVICIOS ---
         private readonly ReportesService _reportesService;
-        private readonly ClientesLogicService _logicService;
+        private readonly IClientesLogicService _logicService;
         private readonly CatalogoService _catalogoService;
         private readonly SucursalesService _sucursalesService;
 
@@ -204,7 +205,7 @@ namespace WPF_PAR.MVVM.ViewModels
         // =============================================================================
         // CONSTRUCTOR ACTUALIZADO (Recibe string, crea servicios)
         // =============================================================================
-        public ClientesViewModel(ReportesService reportesService, ClientesService clientesService, SucursalesService sucursalesService, ClientesLogicService logicService, CatalogoService catalogoService, IDialogService dialogService, INotificationService notificationService, FilterService filterService)
+        public ClientesViewModel(ReportesService reportesService, ClientesService clientesService, SucursalesService sucursalesService, IClientesLogicService logicService, CatalogoService catalogoService, IDialogService dialogService, INotificationService notificationService, FilterService filterService)
         {
             _reportesService = reportesService;
             _clientesService = clientesService;
@@ -348,7 +349,7 @@ namespace WPF_PAR.MVVM.ViewModels
                     {
                         var info = _catalogoService.ObtenerInfo(venta.Articulo);
                         venta.Descripcion = info.Descripcion;
-                        venta.LitrosUnitarios = ( double ) info.Litros;
+                        venta.LitrosUnitarios = info.Litros;
                         // Si tu lógica requiere calcular totales manuales:
                         // venta.LitrosTotal = venta.Cantidad * (double)info.Litros;
                     }

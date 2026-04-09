@@ -8,5 +8,8 @@ namespace WPF_PAR.Core.Services.Interfaces
     {
         string NormalizarFamilia(string textoRaw);
         string ObtenerColorFamilia(string nombreFamilia);
+        void SetParSystemConnectionString(string connString);
+        string GetParSystemConnectionString();
+
     }
 }

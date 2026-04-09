@@ -8,6 +8,9 @@ namespace WPF_PAR.Core.Models
     {
         public string Articulo { get; set; }
         public string Descripcion { get; set; }
+        public string Familia { get; set; }
+        public string Linea { get; set; }
+        public decimal LitrosUnitarios { get; set; }
         public decimal VentaAnterior { get; set; } 
         public decimal VentaActual { get; set; } 
         public decimal Diferencia => VentaActual - VentaAnterior;

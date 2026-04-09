@@ -6,14 +6,15 @@ using WPF_PAR.Core;
 using WPF_PAR.Core.Configuration;
 using WPF_PAR.Core.Helpers;
 using WPF_PAR.Core.Models;
+using WPF_PAR.Core.Services.Interfaces;
 
 namespace WPF_PAR.Core.Services
 {
     public class FamiliaLogicService
     {
-        private readonly BusinessLogicService _businessLogic;
+        private readonly IBusinessLogicService _businessLogic;
 
-        public FamiliaLogicService(BusinessLogicService businessLogic)
+        public FamiliaLogicService(IBusinessLogicService businessLogic)
         {
             _businessLogic = businessLogic;
         }

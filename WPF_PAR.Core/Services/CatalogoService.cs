@@ -1,99 +1,93 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Globalization;
-using System.IO;
-using System.Text;
-
+using System.Threading.Tasks;
 using WPF_PAR.Core.Models;
-using WPF_PAR.Core.Services;
+using WPF_PAR.Core.Services.Interfaces;
 
 namespace WPF_PAR.Core.Services
 {
     public class CatalogoService
     {
         private Dictionary<string, ProductoInfo> _catalogo;
-        private readonly BusinessLogicService _businessLogic;
-        public CatalogoService(BusinessLogicService businessLogic)
+        private readonly SqlHelper _sql;
+        private readonly IBusinessLogicService _businessLogic;
+
+        public CatalogoService(IBusinessLogicService businessLogic)
         {
             _businessLogic = businessLogic;
-            _catalogo = [];
-            CargarDesdeCSV();
+            _catalogo = new Dictionary<string, ProductoInfo>(StringComparer.OrdinalIgnoreCase);
+            // Nos conectamos a ParSystem (donde vive tu tabla Catalogo_Productos)
+            _sql = new SqlHelper(businessLogic.GetParSystemConnectionString());
         }
-        private void CargarDesdeCSV()
+
+        // ========================================================
+        // DESCARGA TODO DE SQL AL DICCIONARIO
+        // ========================================================
+        public async Task CargarCatalogoSqlAsync()
         {
             try
             {
-                string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "Productos.csv");
-                if ( !File.Exists(path) ) return;
+                // Hacemos que los alias de SQL coincidan EXACTO con tu ProductoInfo
+                string query = @"
+                    SELECT 
+                        CodigoArticulo, 
+                        Descripcion, 
+                        Categoria,
+                        Grupo,
+                        Familia, 
+                        ISNULL([A.Linea], 'Sin Linea') AS Linea, 
+                        ISNULL([Color-Tipo], 'Sin Color') AS ColorTipo, 
+                        CAST(ISNULL(Litros, 0) AS DECIMAL(18,4)) AS Litros 
+                    FROM Catalogo_Productos";
 
-                var lineas = File.ReadAllLines(path).Skip(1);
+                var listaSql = await _sql.QueryAsync<ProductoInfo>(query);
 
-                foreach ( var linea in lineas )
+                _catalogo.Clear(); // Limpiamos por si el Worker se reinicia
+
+                foreach (var item in listaSql)
                 {
-                    var col = ParseCsvLine(linea);
-                    if ( col.Count < 8 ) continue;
+                    // Limpiamos la familia usando tu regla de negocio (quitar acentos, etc.)
+                    item.Familia = _businessLogic.NormalizarFamilia(item.Familia ?? "Otros");
 
-                    string clave = col[0].Trim();
-                    string descripcion = col[1].Trim().Replace("\"", "");
-                    string familiaRaw = col[4].Trim();
-                    string litrosStr = col[7].Trim();
-                    string lineaRaw = col.Count > 5 ? col[5].Trim() : "Sin Linea";
-                    string colorRaw = col.Count > 6 ? col[6].Trim() : "Sin Color";
+                    // Limpieza de nulos por seguridad
+                    item.CodigoArticulo = item.CodigoArticulo?.Trim() ?? "";
+                    item.Descripcion = item.Descripcion?.Trim() ?? "Sin Descripción";
 
-                    if ( !double.TryParse(litrosStr, NumberStyles.Any, CultureInfo.InvariantCulture, out double litros) )
-                        litros = 0;
-
-                    if ( !_catalogo.ContainsKey(clave) )
+                    // Lo agregamos al diccionario usando CodigoArticulo como llave
+                    if (!string.IsNullOrEmpty(item.CodigoArticulo) && !_catalogo.ContainsKey(item.CodigoArticulo))
                     {
-                        string familiaNormalizada = _businessLogic.NormalizarFamilia(familiaRaw);
-
-                        _catalogo.Add(clave, new ProductoInfo
-                        {
-                            Clave = clave,
-                            Descripcion = descripcion,
-                            FamiliaSimple = familiaNormalizada, 
-                            Litros = litros,
-                            Linea = lineaRaw,
-                            Color = colorRaw,
-                        });
+                        _catalogo.Add(item.CodigoArticulo, item);
                     }
                 }
             }
-            catch ( Exception ex )
+            catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine("Error cargando CSV: " + ex.Message);
+                Console.WriteLine("❌ ERROR CRÍTICO SQL CATÁLOGO: " + ex.Message);
+                System.Diagnostics.Debug.WriteLine("Error cargando catálogo desde SQL: " + ex.Message);
             }
         }
-        private List<string> ParseCsvLine(string line)
-        {
-            var result = new List<string>();
-            bool inQuotes = false;
-            string currentField = "";
 
-            for ( int i = 0; i < line.Length; i++ )
+        // ========================================================
+        // BÚSQUEDA RÁPIDA (Usado por el Worker en cada vuelta)
+        // ========================================================
+        public ProductoInfo ObtenerInfo(string codigoProducto)
+        {
+            if (!string.IsNullOrWhiteSpace(codigoProducto) && _catalogo.ContainsKey(codigoProducto))
             {
-                char c = line[i];
-
-                if ( c == '"' ) inQuotes = !inQuotes;
-                else if ( c == ',' && !inQuotes ) { result.Add(currentField); currentField = ""; }
-                else currentField += c;
+                return _catalogo[codigoProducto];
             }
-            result.Add(currentField);
-            return result;
-        }
 
-        public ProductoInfo ObtenerInfo(string claveProducto)
-        {
-            if ( _catalogo.ContainsKey(claveProducto) ) return _catalogo[claveProducto];
-
+            // Producto por defecto "comodín" si se vende algo que no está en la tabla
             return new ProductoInfo
             {
-                FamiliaSimple = "Accesorios",
-                Litros = 0,
+                CodigoArticulo = codigoProducto ?? "Desconocido",
                 Descripcion = "Producto (Sin Catálogo)",
+                Categoria = "Sin Categoria",
+                Grupo = "Sin Grupo",
+                Familia = "Otros", // Puedes mandar esto a "Accesorios" si lo prefieres
                 Linea = "Sin Linea",
-                Color = "Sin Color",
-                FamiliaCsv = "Otros"
+                ColorTipo = "Sin Color",
+                Litros = 0m // La "m" es para decirle a C# que es un Decimal
             };
         }
     }

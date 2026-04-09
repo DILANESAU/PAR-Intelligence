@@ -149,14 +149,15 @@ namespace WPF_PAR.Core.Services
         // ========================================================
         // DASHBOARD TENDENCIA
         // ========================================================
-        public async Task GuardarDashboardAsync(int idSucursal, List<GraficoPuntoModel> tendencia)
+        public async Task GuardarDashboardAsync(int idSucursal, object tendencia)
         {
+            // El resto del código de este método se queda IGUAL.
             string json = JsonConvert.SerializeObject(tendencia);
             string sql = @"
-                IF EXISTS (SELECT 1 FROM Cache_Dashboard WHERE IdSucursal = @IdSucursal)
-                    UPDATE Cache_Dashboard SET JsonGraficaTendencia = @Json WHERE IdSucursal = @IdSucursal
-                ELSE
-                    INSERT INTO Cache_Dashboard (IdSucursal, JsonGraficaTendencia) VALUES (@IdSucursal, @Json)";
+        IF EXISTS (SELECT 1 FROM Cache_Dashboard WHERE IdSucursal = @IdSucursal)
+            UPDATE Cache_Dashboard SET JsonGraficaTendencia = @Json WHERE IdSucursal = @IdSucursal
+        ELSE
+            INSERT INTO Cache_Dashboard (IdSucursal, JsonGraficaTendencia) VALUES (@IdSucursal, @Json)";
 
             await _sqlHelper.ExecuteAsync(sql, new { IdSucursal = idSucursal, Json = json });
         }

@@ -33,7 +33,7 @@ namespace WPF_PAR.MVVM.ViewModels
         public FilterService Filters { get; }
         public ISnackbarMessageQueue ErrorMessageQueue { get; set; }
 
-        public ObservableCollection<string> Periodos { get; set; } = new ObservableCollection<string> { "Esta Semana", "Este Mes", "Este Año" };
+        public ObservableCollection<string> Periodos { get; set; } = new ObservableCollection<string> { "Hoy", "Esta Semana", "Este Mes", "Este Año" };
 
         private string _textoComparativo;
         public string TextoComparativo { get => _textoComparativo; set { _textoComparativo = value; OnPropertyChanged(); } }
@@ -41,7 +41,7 @@ namespace WPF_PAR.MVVM.ViewModels
         private bool _esCrecimientoPositivo;
         public bool EsCrecimientoPositivo { get => _esCrecimientoPositivo; set { _esCrecimientoPositivo = value; OnPropertyChanged(); } }
 
-        private string _periodoSeleccionado = "Este Mes";
+        private string _periodoSeleccionado = "Hoy";
         public string PeriodoSeleccionado
         {
             get => _periodoSeleccionado;
@@ -113,7 +113,6 @@ namespace WPF_PAR.MVVM.ViewModels
 
         private bool _isLoading;
         public bool IsLoading { get => _isLoading; set { _isLoading = value; OnPropertyChanged(); } }
-
         public DashboardViewModel(ReportesService reporteServices, SucursalesService sucursalesService, IDialogService dialogService, INotificationService notificationService, FilterService filterService)
         {
             _reporteServices = reporteServices;
@@ -131,7 +130,6 @@ namespace WPF_PAR.MVVM.ViewModels
             ActualizarCommand = new RelayCommand(o => CargarDatos());
             ConfigurarEjesIniciales();
         }
-
         private void ConfigurarEjesIniciales()
         {
             bool isDark = false;
@@ -140,7 +138,6 @@ namespace WPF_PAR.MVVM.ViewModels
             EjeX = new Axis[] { new Axis { LabelsPaint = new SolidColorPaint(colorTexto) } };
             EjeY = new Axis[] { new Axis { Labeler = v => $"{v:C0}", LabelsPaint = new SolidColorPaint(colorTexto) } };
         }
-
         public void CargarDatosIniciales()
         {
             if ( Sucursales.Count == 0 )
@@ -162,7 +159,6 @@ namespace WPF_PAR.MVVM.ViewModels
                 SucursalSeleccionada = encontrada ?? Sucursales.First();
             }
         }
-
         public async void CargarDatos()
         {
             if ( IsLoading ) return;
@@ -178,8 +174,19 @@ namespace WPF_PAR.MVVM.ViewModels
                 DateTime fechaFin = DateTime.Now.Date;
                 bool agruparPorMes = false;
 
+                var datosGrafico = await _reporteServices.ObtenerTendenciaGrafica(sucursalId, PeriodoSeleccionado);
+
+                // Leemos TODO el mes en curso de la base de datos
+                var datosMesCompleto = await _reporteServices.ObtenerVentasDetalleAsync(sucursalId);
+
+                List<VentaReporteModel> datosParaKpis;
+
                 switch ( PeriodoSeleccionado )
                 {
+                    case "Hoy":
+                        fechaInicio = DateTime.Now.Date;
+                        fechaFin = DateTime.Now.Date;
+                        break;
                     case "Esta Semana":
                         int diff = ( 7 + ( DateTime.Now.DayOfWeek - DayOfWeek.Monday ) ) % 7;
                         fechaInicio = DateTime.Now.AddDays(-1 * diff).Date;
@@ -191,23 +198,26 @@ namespace WPF_PAR.MVVM.ViewModels
                         fechaInicio = new DateTime(DateTime.Now.Year, 1, 1);
                         fechaFin = new DateTime(DateTime.Now.Year, 12, 31);
                         agruparPorMes = true;
+                        datosParaKpis = datosMesCompleto;
                         break;
                 }
-
+                datosParaKpis = datosMesCompleto
+                .Where(x => x.FechaEmision.Date >= fechaInicio.Date && x.FechaEmision.Date <= fechaFin.Date)
+                .ToList();
                 // 2. Leer del caché
-                var datosGrafico = await _reporteServices.ObtenerTendenciaGrafica(sucursalId, fechaInicio, fechaFin, agruparPorMes);
                 var datosActuales = await _reporteServices.ObtenerVentasDetalleAsync(sucursalId);
 
                 // 3. Llenar KPIs
-                KpiVentas = datosActuales.Sum(x => x.TotalVenta);
-                KpiLitros = ( decimal ) datosActuales.Sum(x => x.LitrosTotales);
-                KpiUtilidad = datosActuales.Sum(x => x.UtilidadBruta);
-                KpiMargen = KpiVentas > 0 ? ( KpiUtilidad / KpiVentas ) : 0;
+                KpiVentas = datosParaKpis.Sum(x => x.TotalVenta);
+                // Calculamos los litros correctamente multiplicando cantidad por los litros de la descripción
+                KpiLitros = (decimal)datosParaKpis.Sum(x => x.Cantidad * x.LitrosUnitarios);
+                KpiUtilidad = datosParaKpis.Sum(x => x.UtilidadBruta);
+                KpiMargen = KpiVentas > 0 ? (KpiUtilidad / KpiVentas) : 0;
 
                 ListaVentas.Clear();
-                foreach ( var item in datosActuales ) ListaVentas.Add(item);
+                foreach ( var item in datosParaKpis) ListaVentas.Add(item);
 
-                ProcesarDatosResumen(datosActuales);
+                ProcesarDatosResumen(datosParaKpis);
 
                 // 4. Dibujar gráfica con relleno de ceros
                 ConfigurarGraficoDinamico(datosGrafico, fechaInicio, fechaFin, PeriodoSeleccionado);
@@ -251,6 +261,15 @@ namespace WPF_PAR.MVVM.ViewModels
                     etiquetas.Add(nombresMeses[i - 1]);
                 }
             }
+            else if (periodoTipo == "Hoy") 
+            {
+                for (int i = 8; i <= 18; i++)
+                {
+                    var dato = datos.FirstOrDefault(x => x.Indice == i);
+                    valores.Add(dato?.Total ?? 0);
+                    etiquetas.Add($"{i}:00");
+                }
+            }
             else if ( periodoTipo == "Esta Semana" )
             {
                 for ( int i = 0; i < 7; i++ )
@@ -276,7 +295,7 @@ namespace WPF_PAR.MVVM.ViewModels
             {
                 new LineSeries<decimal?>
                 {
-                    Name = "Ventas",
+                    Name = "Litros",
                     Values = valores.ToArray(),
                     Fill = new SolidColorPaint(SKColors.CornflowerBlue.WithAlpha(30)),
                     Stroke = new SolidColorPaint(SKColors.CornflowerBlue) { StrokeThickness = 3 },
@@ -287,7 +306,7 @@ namespace WPF_PAR.MVVM.ViewModels
             };
 
             EjeX = new Axis[] { new Axis { Labels = etiquetas.ToArray(), LabelsPaint = new SolidColorPaint(colorTexto), TextSize = 12 } };
-            EjeY = new Axis[] { new Axis { Labeler = v => $"{v:C0}", LabelsPaint = new SolidColorPaint(colorTexto), TextSize = 12, SeparatorsPaint = new SolidColorPaint(colorSeparador) } };
+            EjeY = new Axis[] { new Axis { Labeler = v => $"{v:N0} Lts", LabelsPaint = new SolidColorPaint(colorTexto) } };
 
             OnPropertyChanged(nameof(SeriesVentas));
             OnPropertyChanged(nameof(EjeX));
@@ -313,7 +332,7 @@ namespace WPF_PAR.MVVM.ViewModels
                 .Select(g => new TopProductoItem
                 {
                     Nombre = string.IsNullOrEmpty(g.Key) ? "Público General" : g.Key,
-                    Monto = g.Sum(x => x.TotalVenta)
+                    Monto = (decimal)g.Sum(x => x.LitrosTotales)
                 })
                 .OrderByDescending(x => x.Monto)
                 .Take(5)

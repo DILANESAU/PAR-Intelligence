@@ -78,8 +78,8 @@ namespace WPF_PAR.Core.Services // O el namespace donde decidas ponerlo
 
             foreach ( var item in datos )
             {
-                decimal precioUnitarioVisual = 0;
-                if ( Math.Abs(item.Cantidad) > 0.001 )
+                decimal precioUnitarioVisual = 0m;
+                if ( Math.Abs(item.Cantidad) > 0.001m )
                 {
                     precioUnitarioVisual = Math.Abs(item.TotalVenta / ( decimal ) item.Cantidad);
                 }
@@ -157,7 +157,7 @@ namespace WPF_PAR.Core.Services // O el namespace donde decidas ponerlo
                     FechaEmision = new DateTime(anio, periodo, 1),
                     Articulo = r.Articulo.ToString().Trim(),
                     Cliente = r.Cliente.ToString(),
-                    Cantidad = cant,
+                    Cantidad = (decimal)cant,
                     TotalVenta = total,
                     LitrosUnitarios = 1,
                     PrecioUnitario = Math.Abs(cant) > 0.001 ? Math.Abs(total / (decimal)cant) : 0,
@@ -168,37 +168,41 @@ namespace WPF_PAR.Core.Services // O el namespace donde decidas ponerlo
             return listaFinal;
         }
 
-        public async Task<List<GraficoPuntoModel>> ObtenerTendenciaGrafica(int sucursalId, DateTime inicio, DateTime fin, bool agruparPorMes)
+        public async Task<List<GraficoPuntoModel>> ObtenerTendenciaGrafica(int sucursalId, DateTime inicio, DateTime fin, string tipoAgrupacion)
         {
             string filtroSucursal = sucursalId > 0 ? "AND vd.Sucursal = @Sucursal" : "";
-            string agrupador = agruparPorMes ? "MONTH(v.FechaEmision)" : "DAY(v.FechaEmision)";
+            string agrupador = "";
+
+            // Elegimos cómo agrupar el tiempo
+            if (tipoAgrupacion == "Mes") agrupador = "MONTH(v.FechaEmision)";
+            else if (tipoAgrupacion == "Dia") agrupador = "DAY(v.FechaEmision)";
+            // OJO AQUÍ: Si en tu Intelisis "FechaEmision" guarda 00:00:00, cambia "v.FechaEmision" por "v.FechaRegistro" en la siguiente línea:
+            else if (tipoAgrupacion == "Hora") agrupador = "DATEPART(HOUR, v.FechaRegistro)";
 
             string query = $@"
-            SELECT 
-                {agrupador} as Indice, 
-                ISNULL(SUM(
-                    CASE 
-                        WHEN v.Mov LIKE '%Devoluci%n%' OR v.Mov LIKE '%Bonifica%' 
-                        THEN ((vd.Cantidad * vd.Precio) * -1)
-                        ELSE (vd.Cantidad * vd.Precio)
-                    END
-                ), 0) AS Total
-            FROM VentaD vd
-            JOIN Venta v ON vd.ID = v.ID
-            WHERE 
-                v.Estatus = 'CONCLUIDO'
-                {filtroSucursal}
-                AND v.FechaEmision >= @Inicio 
-                AND v.FechaEmision < DATEADD(day, 1, @Fin)
-                AND v.Mov NOT LIKE '%Pedido%'
-                AND v.Mov NOT LIKE '%Venta Perdida%'
-                AND v.Mov NOT LIKE '%Cotiza%'
-                AND v.Mov NOT LIKE '%Carta Porte%'
-            GROUP BY {agrupador}
-            ORDER BY {agrupador}";
+    SELECT 
+        {agrupador} as Indice, 
+        
+        -- LITROS (Con regla de devoluciones)
+        ISNULL(SUM(
+            CASE 
+                WHEN v.Mov LIKE '%Devoluci%n%' THEN (vd.Cantidad * -1)
+                WHEN v.Mov LIKE '%Bonifica%' THEN 0 
+                ELSE vd.Cantidad
+            END
+        ), 0) AS Total
+    FROM VentaD vd
+    JOIN Venta v ON vd.ID = v.ID
+    WHERE 
+        v.Estatus = 'CONCLUIDO'
+        {filtroSucursal}
+        AND v.FechaEmision >= @Inicio 
+        AND v.FechaEmision < DATEADD(day, 1, @Fin)
+        AND (v.Mov LIKE 'Factura%' OR v.Mov LIKE 'Remisi%n%' OR v.Mov LIKE 'Nota%' OR v.Mov LIKE '%Devoluci%n%' OR v.Mov LIKE '%Bonifica%')
+    GROUP BY {agrupador}
+    ORDER BY {agrupador}";
 
             var parametros = new { Sucursal = sucursalId, Inicio = inicio, Fin = fin };
-
             return await _sqlHelper.QueryAsync<GraficoPuntoModel>(query, parametros);
         }
 
@@ -396,7 +400,7 @@ namespace WPF_PAR.Core.Services // O el namespace donde decidas ponerlo
         ISNULL(SUM(
             CASE 
                 WHEN v.Mov LIKE '%Devoluci%n%' OR v.Mov LIKE '%Bonifica%' 
-                THEN ((vd.Cantidad * vd.Precio) * -1)
+                THEN ((vd.Cantidad * vd.Precio) * (1 - (ISNULL(vd.DescuentoLinea, 0) / 100.0)))
                 ELSE (vd.Cantidad * vd.Precio)
             END
         ), 0) AS TotalVenta,

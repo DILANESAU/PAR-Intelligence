@@ -299,7 +299,7 @@ namespace WPF_PAR.MVVM.ViewModels
                 _datosFamiliaActual = ventasCompletas.Where(x => x.Familia == familia).ToList();
 
                 GranTotalVenta = _datosFamiliaActual.Sum(x => x.TotalVenta);
-                GranTotalLitros = _datosFamiliaActual.Sum(x => x.LitrosTotales);
+                GranTotalLitros = (double)_datosFamiliaActual.Sum(x => x.LitrosTotales);
                 TituloReporteCard = "📥 DESCARGAR DETALLE";
 
                 OnPropertyChanged(nameof(GranTotalVenta));
@@ -369,7 +369,7 @@ namespace WPF_PAR.MVVM.ViewModels
 
             SeriesPastelLitros = resumenDatos.OrderByDescending(x => x.Litros).Take(5).Select(x => new PieSeries<double>
             {
-                Values = new double[] { x.Litros },
+                Values = new double[] { (double)x.Litros },
                 Name = NormalizarNombreProducto(x.Nombre),
                 InnerRadius = 0,
                 DataLabelsFormatter = p => $"{p.Model:N0} L ({p.StackedValue.Share:P0})",
@@ -384,7 +384,7 @@ namespace WPF_PAR.MVVM.ViewModels
             {
                 Descripcion = string.IsNullOrEmpty(x.Cliente) ? "PÚBLICO GENERAL" : x.Cliente,
                 TotalVenta = x.TotalVenta,
-                LitrosTotal = x.LitrosTotales // <--- ChartService probablemente usa esta para gráficas
+                LitrosTotal = (double)x.LitrosTotales // <--- ChartService probablemente usa esta para gráficas
             }).ToList();
 
             var resClientes = _chartService.GenerarTopProductos(datosParaClientes, VerPorLitros, TopSeleccionado);

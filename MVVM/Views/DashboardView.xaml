@@ -91,7 +91,7 @@
                                                  Foreground="White" Opacity="0.1" Margin="-20,-20"/>
 
                         <StackPanel Margin="25" VerticalAlignment="Center">
-                            <TextBlock Text="Ingresos Totales" Foreground="White" Opacity="0.8" FontSize="14" FontWeight="SemiBold"/>
+                            <TextBlock Text="Ventas Totales" Foreground="White" Opacity="0.8" FontSize="14" FontWeight="SemiBold"/>
                             <TextBlock Text="{Binding KpiVentas, StringFormat={}{0:C0}}" 
                                        Foreground="White" FontSize="32" FontWeight="Bold" Margin="0,5,0,15"/>
 

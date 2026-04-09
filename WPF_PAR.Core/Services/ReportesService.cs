@@ -44,18 +44,23 @@ namespace WPF_PAR.Core.Services
         // ============================================================
         // 2. EL QUE USA EL DASHBOARD (GRÁFICA DE TENDENCIA)
         // ============================================================
-        public async Task<List<GraficoPuntoModel>> ObtenerTendenciaGrafica(int sucursalId, DateTime inicio, DateTime fin, bool agruparPorMes)
+        // Ahora recibe un "string periodoSeleccionado" en lugar de fechas
+        public async Task<List<GraficoPuntoModel>> ObtenerTendenciaGrafica(int sucursalId, string periodoSeleccionado)
         {
-            string query = @"
-                SELECT JsonGraficaTendencia 
-                FROM Cache_Dashboard 
-                WHERE IdSucursal = @Sucursal";
-
+            string query = @"SELECT JsonGraficaTendencia FROM Cache_Dashboard WHERE IdSucursal = @Sucursal";
             var json = await _sqlHelper.QueryFirstOrDefaultAsync<string>(query, new { Sucursal = sucursalId });
 
-            return string.IsNullOrEmpty(json)
-                ? new List<GraficoPuntoModel>()
-                : JsonConvert.DeserializeObject<List<GraficoPuntoModel>>(json);
+            if (string.IsNullOrEmpty(json)) return new List<GraficoPuntoModel>();
+
+            // Deserializamos el diccionario
+            var dict = JsonConvert.DeserializeObject<Dictionary<string, List<GraficoPuntoModel>>>(json);
+
+            // Devolvemos la gráfica exacta que el usuario pidió
+            if (periodoSeleccionado == "Hoy" && dict.ContainsKey("Hoy")) return dict["Hoy"];
+            if (periodoSeleccionado == "Este Año" && dict.ContainsKey("Anio")) return dict["Anio"];
+
+            // Por defecto (sirve para "Esta Semana" y "Este Mes"), devolvemos la de Mes
+            return dict.ContainsKey("Mes") ? dict["Mes"] : new List<GraficoPuntoModel>();
         }
 
         // ============================================================

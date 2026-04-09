@@ -1,10 +1,11 @@
-﻿using System;
+﻿using Microsoft.IdentityModel.Protocols;
+using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Configuration;
 
 using WPF_PAR.Core.Models;
 using WPF_PAR.Core.Services.Interfaces;
-
 namespace WPF_PAR.Core.Services
 {
     public class BusinessLogicService : IBusinessLogicService
@@ -40,6 +41,22 @@ namespace WPF_PAR.Core.Services
             return config != null ? config.NombreNormalizado : "Otros";
         }
 
+        private string _overrideConnString;
+        public void SetParSystemConnectionString(string connString)
+        {
+            _overrideConnString = connString;
+        }
+
+        public string GetParSystemConnectionString()
+        {
+            // 1. Si el Worker nos inyectó la cadena desde el appsettings.json, la usamos:
+            if (!string.IsNullOrEmpty(_overrideConnString))
+                return _overrideConnString;
+
+            // 2. Si estamos en WPF, leemos el App.config clásico:
+            var connStr = System.Configuration.ConfigurationManager.ConnectionStrings["ParSystem"];
+            return connStr != null ? connStr.ConnectionString : "";
+        }
         public string ObtenerColorFamilia(string nombreFamilia)
         {
             var config = _configuraciones.FirstOrDefault(c => c.NombreNormalizado == nombreFamilia);
