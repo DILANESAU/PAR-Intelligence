@@ -11,8 +11,8 @@ namespace WPF_PAR.Core.Models
         public string Categoria { get; set; }
         public string Grupo { get; set; }
         public string Familia { get; set; }
-        public string Linea { get; set; } // Mapearemos A.Linea aquí
-        public string ColorTipo { get; set; } // Mapearemos Color-Tipo aquí
+        public string Linea { get; set; }
+        public string ColorTipo { get; set; }
         public decimal Litros { get; set; }
     }
 }

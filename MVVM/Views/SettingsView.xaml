@@ -67,82 +67,49 @@
                                     SelectedValuePath="Key"
                                     DisplayMemberPath="Value"
                                     Style="{StaticResource MaterialDesignOutlinedComboBox}"
-                                    Margin="0,10"
-                                    IsEnabled="{Binding EsModoTecnico}"/>
+                                    Margin="0,10"/>
 
-                                <Button Grid.Column="1" Command="{Binding GuardarSucursalCommand}" Margin="10,0,0,0"
-                                        Style="{StaticResource MaterialDesignIconForegroundButton}" ToolTip="Guardar">
-                                    <materialDesign:PackIcon Kind="ContentSave" Width="20" Height="20" Foreground="{DynamicResource PrimaryHueMidBrush}"/>
-                                </Button>
+                                
                             </Grid>
                         </StackPanel>
                     </Grid>
                 </materialDesign:Card>
+                
             </Grid>
+
+            <materialDesign:Card Grid.Row="1" Margin="0,0,0,20" Padding="20" 
+                         Visibility="{Binding EsModoTecnico, Converter={StaticResource BoolToVis}}">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                        <materialDesign:PackIcon Kind="ShieldAccount" Width="24" Height="24" Foreground="{DynamicResource PrimaryHueMidBrush}" Margin="0,0,10,0"/>
+                        <TextBlock Text="Gestión de Accesos y Usuarios" FontWeight="Bold" FontSize="18"/>
+                    </StackPanel>
+
+                    <TextBlock Text="Administra quién tiene acceso al sistema y qué sucursales puede ver." 
+                       Opacity="0.6" Margin="0,0,0,15" TextWrapping="Wrap"/>
+
+                    <StackPanel Orientation="Horizontal">
+                        <Button Command="{Binding VerUsuariosCommand}" 
+                        Style="{StaticResource MaterialDesignOutlinedButton}" 
+                        Margin="0,0,15,0">
+                            <StackPanel Orientation="Horizontal">
+                                <materialDesign:PackIcon Kind="FormatListBulleted" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                <TextBlock Text="Lista de Usuarios"/>
+                            </StackPanel>
+                        </Button>
+
+                        <Button Command="{Binding AbrirAltaUsuarioCommand}" 
+                        Style="{StaticResource MaterialDesignRaisedButton}">
+                            <StackPanel Orientation="Horizontal">
+                                <materialDesign:PackIcon Kind="AccountPlus" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                <TextBlock Text="Nuevo Usuario"/>
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </StackPanel>
+            </materialDesign:Card>
 
             <TextBlock Text="CONEXIÓN A SERVIDORES" FontWeight="Bold" Opacity="0.5" Margin="5,0,0,10"/>
-
-            <Grid Margin="0,0,0,30">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="30"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-
-                <materialDesign:Card Grid.Column="0" UniformCornerRadius="20" Padding="0" materialDesign:ElevationAssist.Elevation="Dp3">
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="*"/>
-                            <RowDefinition Height="Auto"/>
-                        </Grid.RowDefinitions>
-
-                        <Border Background="#FFF3E0" Padding="20">
-                            <StackPanel Orientation="Horizontal">
-                                <materialDesign:PackIcon Kind="Security" Width="24" Height="24" Foreground="#FF9800" VerticalAlignment="Center"/>
-                                <TextBlock Text="Servidor de Seguridad" FontWeight="Bold" FontSize="16" Foreground="#E65100" Margin="10,0,0,0" VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </Border>
-
-                        <StackPanel Grid.Row="1" Margin="20">
-                            <TextBox Text="{Binding AuthServer}" materialDesign:HintAssist.Hint="IP Servidor Login" Style="{StaticResource MaterialDesignFloatingHintTextBox}" Margin="0,0,0,15"/>
-                            <TextBox Text="{Binding AuthDb}" materialDesign:HintAssist.Hint="BD Usuarios" Style="{StaticResource MaterialDesignFloatingHintTextBox}" Margin="0,0,0,15"/>
-                            <TextBox Text="{Binding AuthUser}" materialDesign:HintAssist.Hint="Usuario SQL" Style="{StaticResource MaterialDesignFloatingHintTextBox}" Margin="0,0,0,15"/>
-                            <PasswordBox x:Name="AuthPassBox" Tag="Auth" materialDesign:HintAssist.Hint="Contraseña" Style="{StaticResource MaterialDesignFloatingHintPasswordBox}"/>
-                        </StackPanel>
-
-                        <Button Grid.Row="2" Command="{Binding GuardarConexionCommand}" CommandParameter="{Binding ElementName=AuthPassBox}"
-                                Style="{StaticResource MaterialDesignFlatButton}" Foreground="#E65100" Height="50" Content="GUARDAR CONFIGURACIÓN AUTH"/>
-                    </Grid>
-                </materialDesign:Card>
-
-                <materialDesign:Card Grid.Column="2" UniformCornerRadius="20" Padding="0" materialDesign:ElevationAssist.Elevation="Dp3">
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="*"/>
-                            <RowDefinition Height="Auto"/>
-                        </Grid.RowDefinitions>
-
-                        <Border Background="#E3F2FD" Padding="20">
-                            <StackPanel Orientation="Horizontal">
-                                <materialDesign:PackIcon Kind="Database" Width="24" Height="24" Foreground="#2196F3" VerticalAlignment="Center"/>
-                                <TextBlock Text="Servidor de Datos" FontWeight="Bold" FontSize="16" Foreground="#0D47A1" Margin="10,0,0,0" VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </Border>
-
-                        <StackPanel Grid.Row="1" Margin="20">
-                            <TextBox Text="{Binding DataServer}" materialDesign:HintAssist.Hint="IP Servidor ERP" Style="{StaticResource MaterialDesignFloatingHintTextBox}" Margin="0,0,0,15"/>
-                            <TextBox Text="{Binding DataDb}" materialDesign:HintAssist.Hint="BD Intelisis" Style="{StaticResource MaterialDesignFloatingHintTextBox}" Margin="0,0,0,15"/>
-                            <TextBox Text="{Binding DataUser}" materialDesign:HintAssist.Hint="Usuario SQL" Style="{StaticResource MaterialDesignFloatingHintTextBox}" Margin="0,0,0,15"/>
-                            <PasswordBox x:Name="DataPassBox" Tag="Data" materialDesign:HintAssist.Hint="Contraseña" Style="{StaticResource MaterialDesignFloatingHintPasswordBox}"/>
-                        </StackPanel>
-
-                        <Button Grid.Row="2" Command="{Binding GuardarConexionCommand}" CommandParameter="{Binding ElementName=DataPassBox}"
-                                Style="{StaticResource MaterialDesignFlatButton}" Foreground="#0D47A1" Height="50" Content="GUARDAR CONFIGURACIÓN DATOS"/>
-                    </Grid>
-                </materialDesign:Card>
-            </Grid>
 
             <materialDesign:Card UniformCornerRadius="15" Padding="15" materialDesign:ElevationAssist.Elevation="Dp1" Background="{DynamicResource MaterialDesignPaper}">
                 <Grid>
@@ -167,7 +134,14 @@
                     </StackPanel>
                 </Grid>
             </materialDesign:Card>
-
+            <materialDesign:Snackbar
+        MessageQueue="{Binding MessageQueue}"
+        HorizontalAlignment="Center" 
+        VerticalAlignment="Bottom"
+        Margin="0,0,0,20"
+        Background="#333333"
+        Foreground="White" />
         </StackPanel>
+
     </ScrollViewer>
 </UserControl>

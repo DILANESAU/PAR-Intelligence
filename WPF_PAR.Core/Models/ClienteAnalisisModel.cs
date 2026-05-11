@@ -24,28 +24,41 @@ namespace WPF_PAR.Core.Models
         }
 
         public decimal TotalAnual => VentasMensualesActual.Sum();
-        public decimal TotalAnualAnt => VentasMensualesAnterior.Sum();
 
-        public decimal S1 => VentasMensualesActual.Take(6).Sum();         
-        public decimal S2 => VentasMensualesActual.Skip(6).Take(6).Sum();
 
-        public decimal T1 => VentasMensualesActual.Take(3).Sum();
-        public decimal T2 => VentasMensualesActual.Skip(3).Take(3).Sum();
-        public decimal T3 => VentasMensualesActual.Skip(6).Take(3).Sum();
-        public decimal T4 => VentasMensualesActual.Skip(9).Take(3).Sum();
+        public decimal VentaAnualActual
+        {
+            get
+            {
+                if (VentasMensualesActual == null) return 0;
+                return VentasMensualesActual.Sum();
+            }
+        }
 
-        public decimal M01 => VentasMensualesActual[0];
-        public decimal M02 => VentasMensualesActual[1];
-        public decimal M03 => VentasMensualesActual[2];
-        public decimal M04 => VentasMensualesActual[3];
-        public decimal M05 => VentasMensualesActual[4];
-        public decimal M06 => VentasMensualesActual[5];
-        public decimal M07 => VentasMensualesActual[6];
-        public decimal M08 => VentasMensualesActual[7];
-        public decimal M09 => VentasMensualesActual[8];
-        public decimal M10 => VentasMensualesActual[9];
-        public decimal M11 => VentasMensualesActual[10];
-        public decimal M12 => VentasMensualesActual[11];
+        // 2. Calcula la suma de todo el año anterior
+        public decimal VentaAnualAnterior
+        {
+            get
+            {
+                if (VentasMensualesAnterior == null) return 0;
+                return VentasMensualesAnterior.Sum();
+            }
+        }
+
+        // 3. Calcula la diferencia porcentual para saber si ponerlo verde o rojo
+        public double PorcentajeCrecimiento
+        {
+            get
+            {
+                // Si el año pasado no compró nada, y este año sí, es un crecimiento del 100%
+                if (VentaAnualAnterior == 0)
+                    return VentaAnualActual > 0 ? 1.0 : 0.0;
+
+                // Fórmula matemática del crecimiento: (Actual - Anterior) / Anterior
+                return (double)((VentaAnualActual - VentaAnualAnterior) / VentaAnualAnterior);
+            }
+        }
+
         public int MesesParaCalculoTendencia { get; set; } = 12;
         public double VariacionPorcentual
         {

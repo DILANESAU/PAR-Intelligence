@@ -35,15 +35,15 @@ namespace WPF_PAR.Core.Services
         }
 
         // 2. Obtener KPIs del Cliente (Frecuencia, Ticket Promedio, Última Compra)
-        public async Task<KpiClienteModel> ObtenerKpisCliente(string cliente, int anio, int sucursalId)
+        public async Task<KpiClienteModel> ObtenerKpisCliente(string claveCliente, int anio, int sucursalId)
         {
             // Buscamos los KPIs específicos de ese cliente
             string query = @"
                 SELECT JsonKpi 
                 FROM Cache_Clientes_Detalle 
-                WHERE IdSucursal = @Sucursal AND Anio = @Anio AND Cliente = @Cliente";
+                WHERE IdSucursal = @Sucursal AND Anio = @Anio AND ClaveCliente = @Cliente";
 
-            var parametros = new { Sucursal = sucursalId, Anio = anio, Cliente = cliente };
+            var parametros = new { Sucursal = sucursalId, Anio = anio, Cliente = claveCliente };
 
             var json = await _sqlHelper.QueryFirstOrDefaultAsync<string>(query, parametros);
 
@@ -53,21 +53,37 @@ namespace WPF_PAR.Core.Services
         }
 
         // 3. Obtener Variación de Productos (Top de productos que subieron o bajaron de ventas)
-        public async Task<List<ProductoAnalisisModel>> ObtenerVariacionProductos(string cliente, int anioActual, int sucursalId)
+        public async Task<List<ProductoAnalisisModel>> ObtenerVariacionProductos(string claveCliente, int anioActual, int sucursalId)
         {
             // Obtenemos la lista de variaciones del producto para ese cliente
             string query = @"
                 SELECT JsonVariacion 
                 FROM Cache_Clientes_Detalle 
-                WHERE IdSucursal = @Sucursal AND Anio = @Anio AND Cliente = @Cliente";
+                WHERE IdSucursal = @Sucursal AND Anio = @Anio AND ClaveCliente = @Cliente";
 
-            var parametros = new { Sucursal = sucursalId, Anio = anioActual, Cliente = cliente };
+            var parametros = new { Sucursal = sucursalId, Anio = anioActual, Cliente = claveCliente };
 
             var json = await _sqlHelper.QueryFirstOrDefaultAsync<string>(query, parametros);
 
             return string.IsNullOrEmpty(json)
                 ? new List<ProductoAnalisisModel>()
                 : JsonConvert.DeserializeObject<List<ProductoAnalisisModel>>(json);
+        }
+        // 4. Obtener Historial de 5 Años (Para la nueva Gráfica Dinámica)
+        public async Task<List<HistoricoClienteModel>> ObtenerHistorialCliente(string claveCliente, int sucursalId)
+        {
+            string query = @"
+                SELECT JsonHistorico 
+                FROM Cache_Clientes_Detalle 
+                WHERE IdSucursal = @Sucursal AND ClaveCliente = @Cliente";
+
+            var parametros = new { Sucursal = sucursalId, Cliente = claveCliente };
+
+            var json = await _sqlHelper.QueryFirstOrDefaultAsync<string>(query, parametros);
+
+            return string.IsNullOrEmpty(json)
+                ? new List<HistoricoClienteModel>()
+                : JsonConvert.DeserializeObject<List<HistoricoClienteModel>>(json);
         }
     }
 }

@@ -83,8 +83,19 @@ namespace WPF_PAR.MVVM.ViewModels
             }
         }
 
-        private string _modoSeleccionado = "Anual";
-        public ObservableCollection<string> ModosVista { get; } = new ObservableCollection<string> { "Anual", "Semestral", "Trimestral" };
+        // --- FILTROS PARA LA GRÁFICA COMPARATIVA ---
+        public ObservableCollection<AnioCheckModel> AniosFiltro { get; set; } = new ObservableCollection<AnioCheckModel>();
+
+        private bool _verPorLitros;
+        public bool VerPorLitros
+        {
+            get => _verPorLitros;
+            set { _verPorLitros = value; OnPropertyChanged(); ActualizarGraficaComparativa(); }
+        }
+
+        private string _modoSeleccionado = "Mensual";
+        public ObservableCollection<string> ModosVista { get; } = new ObservableCollection<string> { "Mensual", "Trimestral", "Semestral" };
+
         public string ModoSeleccionado
         {
             get => _modoSeleccionado;
@@ -92,15 +103,12 @@ namespace WPF_PAR.MVVM.ViewModels
             {
                 _modoSeleccionado = value;
                 OnPropertyChanged();
-                CalcularVisibilidadPeriodos();
-                ActualizarGrafica();
-
-                if ( ClienteSeleccionado != null )
-                {
-                    _ = CargarProductosDinamicos();
-                }
+                ActualizarGraficaComparativa(); // Dispara el recalculo dinámico
             }
         }
+
+        // Aquí guardaremos los 5 años en crudo cuando seleccionen un cliente
+        private List<HistoricoClienteModel> _datosHistoricosCrudos;
 
         // --- DATOS PRINCIPALES ---
         private List<ClienteAnalisisModel> _todosLosClientes;
@@ -112,6 +120,7 @@ namespace WPF_PAR.MVVM.ViewModels
         }
 
         // --- CLIENTE SELECCIONADO ---
+        // --- CLIENTE SELECCIONADO ---
         private ClienteAnalisisModel _clienteSeleccionado;
         public ClienteAnalisisModel ClienteSeleccionado
         {
@@ -120,10 +129,19 @@ namespace WPF_PAR.MVVM.ViewModels
             {
                 _clienteSeleccionado = value;
                 OnPropertyChanged();
-                if ( value != null )
+
+                if (value != null)
                 {
+                    // 1. Encendemos el Dashboard de la derecha
+                    EnModoDetalle = true;
+
+                    // 2. Cargamos el historial y las tablas
                     CargarDetalleAdicional(value);
-                    ActualizarGrafica();
+                }
+                else
+                {
+                    // Si se deselecciona, regresamos a la pantalla de espera
+                    EnModoDetalle = false;
                 }
             }
         }
@@ -148,6 +166,28 @@ namespace WPF_PAR.MVVM.ViewModels
             get => _productosEnAumento;
             set { _productosEnAumento = value; OnPropertyChanged(); }
         }
+
+        // MODELO PARA LOS CHECKBOXES DE AÑOS
+        public class AnioCheckModel : ObservableObject
+        {
+            public int Anio { get; set; }
+            private bool _isSelected;
+            private Action _onChange;
+
+            public AnioCheckModel(int anio, bool isSelected, Action onChange)
+            {
+                Anio = anio;
+                _isSelected = isSelected;
+                _onChange = onChange;
+            }
+
+            public bool IsSelected
+            {
+                get => _isSelected;
+                set { _isSelected = value; OnPropertyChanged(); _onChange?.Invoke(); }
+            }
+        }
+
 
         // --- GRÁFICAS ---
         private ISeries[] _seriesGrafica;
@@ -221,6 +261,11 @@ namespace WPF_PAR.MVVM.ViewModels
             AñosDisponibles = new ObservableCollection<int> { year, year - 1, year - 2, year - 3 };
             _anioSeleccionado = year;
 
+            AniosFiltro.Add(new AnioCheckModel(year, true, ActualizarGraficaComparativa));
+            AniosFiltro.Add(new AnioCheckModel(year - 1, true, ActualizarGraficaComparativa));
+            AniosFiltro.Add(new AnioCheckModel(year - 2, false, ActualizarGraficaComparativa));
+            AniosFiltro.Add(new AnioCheckModel(year - 3, false, ActualizarGraficaComparativa));
+
             // 5. Configurar Comandos
             ActualizarCommand = new RelayCommand(o => CargarDatosIniciales());
             ImprimirReporteCommand = new RelayCommand(o => GenerarPdfCliente());
@@ -249,23 +294,43 @@ namespace WPF_PAR.MVVM.ViewModels
 
         public async void CargarDatosIniciales()
         {
-            if ( Sucursales.Count == 0 )
+            if (Sucursales.Count == 0)
             {
                 Sucursales.Clear();
-                Sucursales.Add(new SucursalModel { Id = 0, Nombre = "0 - TODAS" });
 
-                // NOTA: Verifica que tu SucursalesService devuelva el diccionario correctamente
-                var dic = await Task.Run(() => _sucursalesService.CargarSucursales());
+                var diccionario = _sucursalesService.CargarSucursales();
 
-                if ( dic != null )
+                if (diccionario != null && Converters.Session.UsuarioActual != null)
                 {
-                    foreach ( var kvp in dic )
-                        Sucursales.Add(new SucursalModel { Id = kvp.Key, Nombre = $"{kvp.Key} - {kvp.Value}" });
+                    // Obtenemos la "mochila" de permisos del usuario actual
+                    var permisos = Converters.Session.UsuarioActual.SucursalesPermitidas;
+
+                    foreach (var item in diccionario)
+                    {
+                        // Si tiene permisos NULL (Es Jefe) O si la sucursal actual está en su mochila...
+                        if (permisos == null || permisos.Contains(item.Key))
+                        {
+                            // ...entonces sí la agregamos a su combo
+                            Sucursales.Add(new SucursalModel { Id = item.Key, Nombre = $"{item.Key} - {item.Value}" });
+                        }
+                    }
                 }
 
-                int idGuardado = Properties.Settings.Default.SucursalDefaultId;
-                var encontrada = Sucursales.FirstOrDefault(s => s.Id == idGuardado);
-                SucursalSeleccionada = encontrada ?? Sucursales.First();
+                // 🛡️ PROTECCIÓN ANTI-CRASH
+                if (Sucursales.Count > 0)
+                {
+                    int guardada = Properties.Settings.Default.SucursalDefaultId;
+
+                    // Verificamos si la sucursal que tenía guardada está entre sus permitidas
+                    var encontrada = Sucursales.FirstOrDefault(s => s.Id == guardada);
+
+                    // Si la encontró, la usa. Si no, lo forzamos a su primera sucursal permitida.
+                    SucursalSeleccionada = encontrada ?? Sucursales.First();
+                }
+                else
+                {
+                    System.Windows.MessageBox.Show("No se cargaron sucursales permitidas para este módulo.", "Aviso", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
+                }
             }
 
             IsLoading = true;
@@ -294,26 +359,34 @@ namespace WPF_PAR.MVVM.ViewModels
 
         private async Task CargarProductosDinamicos()
         {
-            if ( ClienteSeleccionado == null ) return;
+            if (ClienteSeleccionado == null) return;
             try
             {
-                // El Worker ya hizo la magia de las fechas, solo le pedimos el año
                 var todosProductos = await _clientesService.ObtenerVariacionProductos(
-                    ClienteSeleccionado.Nombre,
+                    ClienteSeleccionado.Cliente,
                     AnioSeleccionado,
                     Filters.SucursalId);
 
-                // Agrupamos el top 10 (El worker ya podría traer solo el Top 10 si así lo configuraste)
-                var declive = todosProductos.Where(x => ( x.VentaActual - x.VentaAnterior ) < 0).OrderBy(x => ( x.VentaActual - x.VentaAnterior )).Take(10).ToList();
-                var aumento = todosProductos.Where(x => ( x.VentaActual - x.VentaAnterior ) > 0).OrderByDescending(x => ( x.VentaActual - x.VentaAnterior )).Take(10).ToList();
+                // 🛑 1. PROTECCIÓN ANTI-NULL: Si SQL no devuelve nada, mandamos listas vacías
+                if (todosProductos == null || !todosProductos.Any())
+                {
+                    ProductosEnDeclive = new ObservableCollection<ProductoAnalisisModel>();
+                    ProductosEnAumento = new ObservableCollection<ProductoAnalisisModel>();
+                    return;
+                }
+
+                // Si sí hay datos, procesamos el top 10
+                var declive = todosProductos.Where(x => (x.VentaActual - x.VentaAnterior) < 0).OrderBy(x => (x.VentaActual - x.VentaAnterior)).Take(10).ToList();
+                var aumento = todosProductos.Where(x => (x.VentaActual - x.VentaAnterior) > 0).OrderByDescending(x => (x.VentaActual - x.VentaAnterior)).Take(10).ToList();
 
                 ProductosEnDeclive = new ObservableCollection<ProductoAnalisisModel>(declive);
                 ProductosEnAumento = new ObservableCollection<ProductoAnalisisModel>(aumento);
-
-                OnPropertyChanged(nameof(ProductosEnDeclive));
-                OnPropertyChanged(nameof(ProductosEnAumento));
             }
-            catch ( Exception ex ) { Debug.WriteLine("Error cargando productos: " + ex.Message); }
+            catch (Exception ex)
+            {
+                // 🚨 2. AHORA SÍ LO VEREMOS EN PANTALLA
+                _notificationService.ShowError("Error SQL en Productos: " + ex.Message);
+            }
         }
 
         private async void GenerarPdfCliente()
@@ -370,49 +443,35 @@ namespace WPF_PAR.MVVM.ViewModels
             }
         }
 
-        private (DateTime Inicio, DateTime Fin) ObtenerRangoFechas()
+
+        private async void CargarDetalleAdicional(ClienteAnalisisModel cliente)
         {
-            int anio = AnioSeleccionado;
-            int mes = DateTime.Now.Month;
-
-            if ( ModoSeleccionado == "Anual" )
-                return (new DateTime(anio, 1, 1), new DateTime(anio, 12, 31));
-
-            if ( ModoSeleccionado == "Semestral" )
-            {
-                bool esS2 = mes > 6;
-                return esS2
-                    ? (new DateTime(anio, 7, 1), new DateTime(anio, 12, 31))
-                    : (new DateTime(anio, 1, 1), new DateTime(anio, 6, 30));
-            }
-
-            if ( ModoSeleccionado == "Trimestral" )
-            {
-                if ( mes <= 3 ) return (new DateTime(anio, 1, 1), new DateTime(anio, 3, 31));
-                if ( mes <= 6 ) return (new DateTime(anio, 4, 1), new DateTime(anio, 6, 30));
-                if ( mes <= 9 ) return (new DateTime(anio, 7, 1), new DateTime(anio, 9, 30));
-                return (new DateTime(anio, 10, 1), new DateTime(anio, 12, 31));
-            }
-
-            return (new DateTime(anio, 1, 1), new DateTime(anio, 12, 31));
-        }
-
-        private async void CargarDetalleAdicional(ClienteAnalisisModel cliente) // Ojo al cambio de tipo si aplica
-        {
-            if ( cliente == null ) return;
+            if (cliente == null) return;
             IsLoading = true;
 
             try
             {
-                // Usamos el servicio de clientes y le pasamos el nombre
-                KpisDetalle = await _clientesService.ObtenerKpisCliente(cliente.Nombre, AnioSeleccionado, Filters.SucursalId);
+                // 1. CARGAR KPIs
+                var kpis = await _clientesService.ObtenerKpisCliente(cliente.Cliente, AnioSeleccionado, Filters.SucursalId);
+
+                // Si la BD regresó nulo, creamos uno vacío para que la UI no truene
+                KpisDetalle = kpis ?? new KpiClienteModel();
+
+                // 2. CARGAR PRODUCTOS (Con su nueva protección)
                 await CargarProductosDinamicos();
+
+                // 3. CARGAR HISTÓRICO Y GRÁFICA
+                _datosHistoricosCrudos = await _clientesService.ObtenerHistorialCliente(cliente.Cliente, Filters.SucursalId);
+                ActualizarGraficaComparativa();
             }
-            catch ( Exception ex )
+            catch (Exception ex)
             {
-                _dialogService.ShowMessage("Error", ex.Message);
+                _dialogService.ShowMessage("Fallo al consultar cliente", ex.Message);
             }
-            finally { IsLoading = false; }
+            finally
+            {
+                IsLoading = false;
+            }
         }
 
         // =============================================================================
@@ -435,54 +494,84 @@ namespace WPF_PAR.MVVM.ViewModels
             OnPropertyChanged(nameof(VisibilityS1)); OnPropertyChanged(nameof(VisibilityS2));
         }
 
-        private void ActualizarGrafica()
+       
+        private void ActualizarGraficaComparativa()
         {
-            if ( ClienteSeleccionado == null || ClienteSeleccionado.VentasMensualesActual == null )
+            if (_datosHistoricosCrudos == null || !_datosHistoricosCrudos.Any())
             {
                 SeriesGrafica = null;
                 return;
             }
 
-            var historia = ClienteSeleccionado.VentasMensualesActual;
-            var valores = new List<decimal>();
-            string[] etiquetas = null;
+            // 1. Ver qué Checkboxes están marcados
+            var aniosActivos = AniosFiltro.Where(a => a.IsSelected).Select(a => a.Anio).ToList();
+            if (!aniosActivos.Any()) { SeriesGrafica = null; return; }
 
-            switch ( ModoSeleccionado )
-            {
-                case "Anual":
-                    valores = historia.ToList();
-                    etiquetas = new[] { "ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SEP", "OCT", "NOV", "DIC" };
-                    break;
-                case "Semestral":
-                    valores.Add(historia.Take(6).Sum());
-                    valores.Add(historia.Skip(6).Take(6).Sum());
-                    etiquetas = new[] { "SEM 1", "SEM 2" };
-                    break;
-                case "Trimestral":
-                    for ( int i = 0; i < 4; i++ ) valores.Add(historia.Skip(i * 3).Take(3).Sum());
-                    etiquetas = new[] { "T1", "T2", "T3", "T4" };
-                    break;
-            }
+            // 2. Filtrar los datos crudos
+            var datosFiltrados = _datosHistoricosCrudos.Where(x => aniosActivos.Contains(x.Anio)).ToList();
 
-            SeriesGrafica = new ISeries[]
+            // 3. LA MAGIA: Agrupar por Mes, Trimestre o Semestre usando matemáticas
+            var datosAgrupados = datosFiltrados.Select(x => new
             {
-                new LineSeries<decimal>
+                x.Anio,
+                x.Venta,
+                x.Litros,
+                Periodo = ModoSeleccionado == "Mensual" ? x.Mes :
+                          ModoSeleccionado == "Trimestral" ? ((x.Mes - 1) / 3) + 1 :
+                          ((x.Mes - 1) / 6) + 1 // Semestral
+            })
+            .GroupBy(x => new { x.Anio, x.Periodo })
+            .Select(g => new
+            {
+                g.Key.Anio,
+                g.Key.Periodo,
+                Venta = g.Sum(v => v.Venta),
+                Litros = g.Sum(l => l.Litros)
+            }).ToList();
+
+            // 4. Crear las Líneas de LiveCharts
+            var nuevasSeries = new List<ISeries>();
+            int periodosMaximos = ModoSeleccionado == "Mensual" ? 12 : ModoSeleccionado == "Trimestral" ? 4 : 2;
+
+            foreach (var anio in aniosActivos.OrderByDescending(a => a))
+            {
+                // Creamos un arreglo lleno de ceros para evitar que la gráfica se descuadre si un mes no hubo ventas
+                var valores = new double[periodosMaximos];
+                var datosDelAnio = datosAgrupados.Where(x => x.Anio == anio).ToList();
+
+                foreach (var d in datosDelAnio)
+                {
+                    if (d.Periodo >= 1 && d.Periodo <= periodosMaximos)
+                    {
+                        valores[d.Periodo - 1] = VerPorLitros ? (double)d.Litros : (double)d.Venta;
+                    }
+                }
+
+                nuevasSeries.Add(new LineSeries<double>
                 {
                     Values = valores,
-                    Fill = new SolidColorPaint(SKColors.DodgerBlue.WithAlpha(30)),
-                    Stroke = new SolidColorPaint(SKColors.DodgerBlue) { StrokeThickness = 3 },
-                    GeometrySize = 8,
-                    GeometryFill = new SolidColorPaint(SKColors.White),
-                    GeometryStroke = new SolidColorPaint(SKColors.DodgerBlue) { StrokeThickness = 2 },
-                    DataLabelsPaint = new SolidColorPaint(SKColors.Black),
+                    Name = $"Año {anio}",
+                    LineSmoothness = 0.5,
+                    GeometrySize = 10,
+                    Stroke = new SolidColorPaint { StrokeThickness = 3 },
                     DataLabelsPosition = LiveChartsCore.Measure.DataLabelsPosition.Top,
-                    DataLabelsFormatter = p => p.Model >= 1000000 ? $"{p.Model/1000000:N1}M" : (p.Model >= 1000 ? $"{p.Model/1000:N0}K" : $"{p.Model:N0}")
-                }
-            };
+                    DataLabelsPaint = new SolidColorPaint(SKColors.Black),
+                    DataLabelsFormatter = p => p.Model >= 1000000 ? $"{p.Model / 1000000:N1}M" : (p.Model >= 1000 ? $"{p.Model / 1000:N0}K" : $"{p.Model:N0}")
+                });
+            }
+
+            SeriesGrafica = nuevasSeries.ToArray();
+
+            // 5. Ajustar el Eje X
+            string[] etiquetas = null;
+            if (ModoSeleccionado == "Mensual") etiquetas = new[] { "ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SEP", "OCT", "NOV", "DIC" };
+            else if (ModoSeleccionado == "Trimestral") etiquetas = new[] { "T1", "T2", "T3", "T4" };
+            else if (ModoSeleccionado == "Semestral") etiquetas = new[] { "S1", "S2" };
 
             EjeXGrafica = new Axis[] { new Axis { Labels = etiquetas, LabelsRotation = 0, TextSize = 12 } };
-            EjeYGrafica = new Axis[] { new Axis { Labeler = v => v >= 1000 ? $"{v / 1000:N0}K" : $"{v:N0}", ShowSeparatorLines = true } };
+            EjeYGrafica = new Axis[] { new Axis { Labeler = v => v >= 1000 ? $"{v / 1000:N0}K" : $"{v:N0}" } };
 
+            OnPropertyChanged(nameof(SeriesGrafica));
             OnPropertyChanged(nameof(EjeXGrafica));
             OnPropertyChanged(nameof(EjeYGrafica));
         }

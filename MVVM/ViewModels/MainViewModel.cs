@@ -104,6 +104,35 @@ namespace WPF_PAR.MVVM.ViewModels
             {
                 UserName = Session.UsuarioActual.NombreCompleto;
                 UserRol = Session.UsuarioActual.Rol;
+
+                if (Session.UsuarioActual.SucursalesPermitidas == null)
+                {
+                    // Es Admin, Director o Sistemas: Le damos TODO el catálogo maestro
+                    ListaSucursales = GlobalFilters.ListaSucursales;
+                }
+                else
+                {
+                    // Es Distribuidor: Filtramos la lista
+                    var sucursalesFiltradas = new Dictionary<int, string>();
+
+                    foreach (var idPermitido in Session.UsuarioActual.SucursalesPermitidas)
+                    {
+                        if (GlobalFilters.ListaSucursales.ContainsKey(idPermitido))
+                        {
+                            sucursalesFiltradas.Add(idPermitido, GlobalFilters.ListaSucursales[idPermitido]);
+                        }
+                    }
+
+                    ListaSucursales = sucursalesFiltradas;
+
+                    // 🚨 PROTECCIÓN CRÍTICA: 
+                    // Si el usuario no tiene la sucursal '0' permitida, y el filtro arranca en 0, 
+                    // lo forzamos a arrancar en su primera sucursal disponible.
+                    if (sucursalesFiltradas.Count > 0 && !sucursalesFiltradas.ContainsKey(GlobalFilters.SucursalSeleccionada))
+                    {
+                        GlobalFilters.SucursalSeleccionada = System.Linq.Enumerable.First(sucursalesFiltradas.Keys);
+                    }
+                }
             }
             else
             {
@@ -132,10 +161,12 @@ namespace WPF_PAR.MVVM.ViewModels
 
             SettingsViewCommand = new RelayCommand(o => CurrentView = SettingsVM);
 
-            ToggleMenuCommand = new RelayCommand(o => IsMenuOpen = !IsMenuOpen);
+            SettingsVM.PeticionNavegacion += (nuevaVista) =>
+            {
+                this.CurrentView = nuevaVista;
+            };
 
-            // Eliminamos "NavegarLineaCommand" ya que la navegación por línea 
-            // ya no aplica en esta nueva arquitectura ultra-rápida.
+            ToggleMenuCommand = new RelayCommand(o => IsMenuOpen = !IsMenuOpen);
         }
     }
 }

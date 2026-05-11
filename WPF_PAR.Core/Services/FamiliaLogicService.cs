@@ -55,7 +55,8 @@ namespace WPF_PAR.Core.Services
                 VentaTotal = 0,
                 LitrosTotal = 0,
                 PorcentajeParticipacion = 0,
-                ProductoEstrella = "---"
+                ProductoEstrella = "---",
+                PrecioPromedio = 0
             };
 
             if ( grupo != null )
@@ -68,7 +69,9 @@ namespace WPF_PAR.Core.Services
                 {
                     modelo.PorcentajeParticipacion = ( double ) ( modelo.VentaTotal / granTotalGlobal );
                 }
-
+                modelo.PrecioPromedio = modelo.LitrosTotal > 0
+                    ? (decimal)(modelo.VentaTotal / (decimal)modelo.LitrosTotal)
+                    : 0;
                 var top = grupo.GroupBy(g => g.Descripcion)
                                .OrderByDescending(x => x.Sum(v => v.LitrosTotales))
                                .FirstOrDefault();

@@ -33,7 +33,7 @@ namespace WPF_PAR
             services.AddSingleton<ThemeService>();
             services.AddSingleton<INotificationService, NotificationService>();
             services.AddSingleton<IDialogService, DialogService>();
-            services.AddSingleton<SecureStorageService>();
+            //services.AddSingleton<SecureStorageService>();
             services.AddSingleton<IBusinessLogicService, BusinessLogicService>();
             services.AddSingleton<IClientesLogicService, ClientesLogicService>();
 

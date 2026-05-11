@@ -102,5 +102,7 @@ namespace WPF_PAR.Converters
         {
             throw new NotImplementedException();
         }
+
+
     }
 }

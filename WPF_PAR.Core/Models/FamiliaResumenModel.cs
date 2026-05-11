@@ -15,5 +15,6 @@ namespace WPF_PAR.Core.Models
         public string ColorTexto { get; set; }
         public double PorcentajeParticipacion { get; set; } 
         public double LitrosTotal { get; set; }
+        public decimal PrecioPromedio { get; set; }
     }
 }

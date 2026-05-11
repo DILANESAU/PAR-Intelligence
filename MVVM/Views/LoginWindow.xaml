@@ -25,8 +25,8 @@
         <Border.Effect>
             <DropShadowEffect BlurRadius="20" ShadowDepth="0" Opacity="0.4" Color="Black"/>
         </Border.Effect>
-
-        <Grid>
+        <materialDesign:DialogHost Identifier="LoginRootDialog">
+            <Grid>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="1.2*"/>
                 <ColumnDefinition Width="*"/>
@@ -35,8 +35,8 @@
             <Border Grid.Column="0" CornerRadius="15,0,0,15">
                 <Border.Background>
                     <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                        <GradientStop Color="#1565C0" Offset="0.0"/>
-                        <GradientStop Color="#0D47A1" Offset="1.0"/>
+                        <GradientStop Color="#0F172A" Offset="0.0"/>
+                        <GradientStop Color="#1E293B" Offset="1.0"/>
                     </LinearGradientBrush>
                 </Border.Background>
 
@@ -45,13 +45,20 @@
                     <Ellipse Width="200" Height="200" Fill="White" Opacity="0.05" Margin="0,0,-50,-50" HorizontalAlignment="Right" VerticalAlignment="Bottom"/>
 
                     <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                        <materialDesign:PackIcon Kind="ChartBubble" Width="100" Height="100" Foreground="White" HorizontalAlignment="Center" Margin="0,0,0,20"/>
+                        <Image Source="pack://application:,,,/Assets/LOGO PAR.png" 
+                            Width="176" Height="110" 
+                            HorizontalAlignment="Center"
+                            RenderOptions.BitmapScalingMode="HighQuality" >
+                            <Image.Effect>
+                                <DropShadowEffect BlurRadius="55" Color="White" ShadowDepth="0" Opacity="0.3"/>
+                            </Image.Effect>
+                        </Image>
                         <TextBlock Text="PAR INTELLIGENCE" Foreground="White" FontSize="28" FontWeight="Bold" HorizontalAlignment="Center"/>
                         <TextBlock Text="Sistema de Análisis Comercial" Foreground="White" FontSize="14" Opacity="0.8" HorizontalAlignment="Center" Margin="0,5,0,0"/>
 
                         <Border Background="White" Height="1" Width="50" Opacity="0.5" Margin="0,20"/>
 
-                        <TextBlock Text="v1.0.2" Foreground="White" FontSize="10" Opacity="0.5" HorizontalAlignment="Center"/>
+                        <TextBlock Text="v1.0" Foreground="White" FontSize="10" Opacity="0.5" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </Grid>
             </Border>
@@ -116,24 +123,45 @@
                         </Button>
 
                         <Button Height="50"
-                                materialDesign:ButtonAssist.CornerRadius="8"
-                                FontSize="16" FontWeight="Bold"
-                                IsHitTestVisible="False"
-                                Opacity="0.7">
+        Margin="0,10,0,10"
+        Background="#6D28D9" 
+        BorderBrush="#7C3AED"
+        Foreground="White"
+        materialDesign:ButtonAssist.CornerRadius="10"
+        FontSize="16" FontWeight="Bold"
+        materialDesign:ElevationAssist.Elevation="Dp3">
+
                             <Button.Style>
                                 <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignRaisedButton}">
                                     <Style.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Background" Value="#7C3AED"/>
+                                        </Trigger>
                                         <DataTrigger Binding="{Binding IsBusy}" Value="False">
-                                            <Setter Property="Visibility" Value="Collapsed"/>
                                         </DataTrigger>
                                     </Style.Triggers>
                                 </Style>
                             </Button.Style>
+
                             <StackPanel Orientation="Horizontal">
                                 <ProgressBar Style="{StaticResource MaterialDesignCircularProgressBar}"
-                                             IsIndeterminate="True"
-                                             Value="0" Width="20" Height="20" Foreground="White" Margin="0,0,10,0"/>
-                                <TextBlock Text="VERIFICANDO..." VerticalAlignment="Center"/>
+                     IsIndeterminate="True"
+                     Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}"
+                     Value="0" Width="22" Height="22" 
+                     Foreground="White" Margin="0,0,12,0"/>
+
+                                <TextBlock VerticalAlignment="Center" RenderTransformOrigin="0.153,-0.11">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Text" Value="INICIAR SESIÓN"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsBusy}" Value="True">
+                                                    <Setter Property="Text" Value="VERIFICANDO..."/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
                             </StackPanel>
                         </Button>
                     </Grid>
@@ -142,6 +170,14 @@
 
                 <TextBlock Grid.Row="2" Text="© 2026 PAR Pinturas" HorizontalAlignment="Center" FontSize="10" Opacity="0.3"/>
             </Grid>
+                <materialDesign:Snackbar
+        MessageQueue="{Binding MessageQueue}"
+        HorizontalAlignment="Center" 
+        VerticalAlignment="Bottom"
+        Margin="0,0,0,20"
+        Background="#333333"
+        Foreground="White" />
         </Grid>
+        </materialDesign:DialogHost>
     </Border>
 </Window>

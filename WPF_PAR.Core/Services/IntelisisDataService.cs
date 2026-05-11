@@ -1,99 +1,20 @@
 ﻿using Dapper;
-
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
-using System.Threading.Tasks;
 using System.Linq;
-
+using System.Threading.Tasks;
 using WPF_PAR.Core.Models;
 
-namespace WPF_PAR.Core.Services // O el namespace donde decidas ponerlo
+namespace WPF_PAR.Core.Services
 {
-    // ⛏️ EL MINERO: Esta clase SOLO la usa el Worker para conectarse a la VPN/Intelisis
     public class IntelisisDataService
     {
         private readonly SqlHelper _sqlHelper;
-
         public IntelisisDataService(string connectionString)
         {
             _sqlHelper = new SqlHelper(connectionString);
         }
-
-        // =================================================================
-        // 1. LAS CONSULTAS VIEJAS DE REPORTES
-        // =================================================================
-        public async Task<List<VentaReporteModel>> ObtenerVentasBrutasRango(int sucursal, DateTime inicio, DateTime fin)
-        {
-            string query = @"
-            SELECT
-                v.FechaEmision,
-                vd.Sucursal,
-                ISNULL((SELECT TOP 1 Nombre FROM Cte WHERE Cliente = v.Cliente), 'Cliente General') AS Cliente, -- Antes NombreCliente
-                v.MovID,
-                v.Mov,
-                vd.Articulo,
-
-                -- 1. CANTIDAD (Volumen) -> Mapea a Propiedad 'Cantidad'
-                ISNULL(SUM(
-                    CASE 
-                        WHEN v.Mov LIKE '%Devoluci%n%' THEN (vd.Cantidad * -1)
-                        WHEN v.Mov LIKE '%Bonifica%' THEN 0
-                        ELSE vd.Cantidad
-                    END
-                ), 0) AS Cantidad, 
-
-                -- 2. DINERO (Saldo) -> Mapea a Propiedad 'TotalVenta'
-                ISNULL(SUM(
-                    CASE 
-                        WHEN v.Mov LIKE '%Devoluci%n%' THEN ((vd.Cantidad * vd.Precio) * -1)
-                        WHEN v.Mov LIKE '%Bonifica%' THEN ((vd.Cantidad * vd.Precio) * -1)
-                        ELSE (vd.Cantidad * vd.Precio)
-                    END
-                ), 0) AS TotalVenta,
-
-                -- 3. DESCUENTOS -> Mapea a Propiedad 'Descuento'
-                ISNULL(SUM(
-                    CASE 
-                       WHEN v.Mov LIKE '%Devoluci%n%' THEN (vd.DescuentoImporte * -1)
-                       ELSE vd.DescuentoImporte
-                    END
-                ), 0) AS Descuento
-
-            FROM VentaD vd
-            JOIN Venta v ON vd.ID = v.ID
-            WHERE
-                v.Estatus = 'CONCLUIDO'
-                AND vd.Sucursal = @Sucursal
-                AND v.FechaEmision >= @Inicio 
-                AND v.FechaEmision < DATEADD(day, 1, @Fin)
-                AND v.Mov NOT LIKE '%Pedido%'
-                AND v.Mov NOT LIKE '%Venta Perdida%'
-                AND v.Mov NOT LIKE '%Cotiza%'
-                AND v.Mov NOT LIKE '%Carta Porte%'
-            GROUP BY
-                v.FechaEmision, vd.Sucursal, v.Cliente, v.MovID, v.Mov, vd.Articulo";
-            var parametros = new { Sucursal = sucursal, Inicio = inicio, Fin = fin };
-
-            var datos = await _sqlHelper.QueryAsync<VentaReporteModel>(query, parametros);
-
-            foreach ( var item in datos )
-            {
-                decimal precioUnitarioVisual = 0m;
-                if ( Math.Abs(item.Cantidad) > 0.001m )
-                {
-                    precioUnitarioVisual = Math.Abs(item.TotalVenta / ( decimal ) item.Cantidad);
-                }
-                else if ( item.Mov != null && item.Mov.Contains("Bonifica") )
-                {
-                    precioUnitarioVisual = item.TotalVenta;
-                }
-                item.PrecioUnitario = Math.Abs(precioUnitarioVisual);
-                item.Articulo = item.Articulo?.Trim();
-            }
-
-            return datos;
-        }
-
         public async Task<List<VentaReporteModel>> ObtenerHistoricoAnualPorArticulo(string ejercicio, string sucursal)
         {
             string sqlWhereSucursal = (!string.IsNullOrEmpty(sucursal) && sucursal != "0")
@@ -115,8 +36,8 @@ namespace WPF_PAR.Core.Services // O el namespace donde decidas ponerlo
 
         ISNULL(SUM(
             CASE 
-                WHEN v.Mov LIKE '%Devoluci%n%' OR v.Mov LIKE '%Bonifica%' THEN ((vd.Cantidad * vd.Precio) * -1)
-                ELSE (vd.Cantidad * vd.Precio)
+                WHEN v.Mov LIKE '%Devoluci%n%' OR v.Mov LIKE '%Bonifica%' THEN (((vd.Cantidad * vd.Precio) / 1.16) * -1)
+                ELSE ((vd.Cantidad * vd.Precio) / 1.16)
             END
         ), 0) AS TotalVenta,
 
@@ -138,6 +59,7 @@ namespace WPF_PAR.Core.Services // O el namespace donde decidas ponerlo
         AND v.Mov NOT LIKE '%Venta Perdida%'
         AND v.Mov NOT LIKE '%Cotiza%'
         AND v.Mov NOT LIKE '%Carta Porte%'
+        AND v.Mov NOT LIKE '%Traslado%'
     GROUP BY v.Periodo, vd.Articulo, v.Cliente";
 
             var parametros = new { Ejercicio = ejercicio, Sucursal = sucursal };
@@ -157,7 +79,7 @@ namespace WPF_PAR.Core.Services // O el namespace donde decidas ponerlo
                     FechaEmision = new DateTime(anio, periodo, 1),
                     Articulo = r.Articulo.ToString().Trim(),
                     Cliente = r.Cliente.ToString(),
-                    Cantidad = (decimal)cant,
+                    Cantidad = cant,
                     TotalVenta = total,
                     LitrosUnitarios = 1,
                     PrecioUnitario = Math.Abs(cant) > 0.001 ? Math.Abs(total / (decimal)cant) : 0,
@@ -167,7 +89,6 @@ namespace WPF_PAR.Core.Services // O el namespace donde decidas ponerlo
 
             return listaFinal;
         }
-
         public async Task<List<GraficoPuntoModel>> ObtenerTendenciaGrafica(int sucursalId, DateTime inicio, DateTime fin, string tipoAgrupacion)
         {
             string filtroSucursal = sucursalId > 0 ? "AND vd.Sucursal = @Sucursal" : "";
@@ -205,10 +126,6 @@ namespace WPF_PAR.Core.Services // O el namespace donde decidas ponerlo
             var parametros = new { Sucursal = sucursalId, Inicio = inicio, Fin = fin };
             return await _sqlHelper.QueryAsync<GraficoPuntoModel>(query, parametros);
         }
-
-        // =================================================================
-        // 2. LAS CONSULTAS VIEJAS DE CLIENTES
-        // =================================================================
         public async Task<List<ClienteAnalisisModel>> ObtenerDatosBaseClientes(int anioActual, int sucursalId)
         {
             int anioAnterior = anioActual - 1;
@@ -221,10 +138,10 @@ namespace WPF_PAR.Core.Services // O el namespace donde decidas ponerlo
                     v.Ejercicio,
                     MONTH(v.FechaEmision) as Mes,
     
-                 ISNULL(SUM(
+                ISNULL(SUM(
                         CASE 
-                        WHEN v.Mov LIKE '%Devoluci%n%' OR v.Mov LIKE '%Bonifica%' THEN ((vd.Cantidad * vd.Precio) * -1)
-                        ELSE (vd.Cantidad * vd.Precio)
+                        WHEN v.Mov LIKE '%Devoluci%n%' OR v.Mov LIKE '%Bonifica%' THEN (((vd.Cantidad * vd.Precio) / 1.16) * -1)
+                        ELSE ((vd.Cantidad * vd.Precio) / 1.16)
                      END
                 ), 0) AS TotalDinero,
     
@@ -290,7 +207,6 @@ namespace WPF_PAR.Core.Services // O el namespace donde decidas ponerlo
 
             return clientesAgrupados;
         }
-
         public async Task<KpiClienteModel> ObtenerKpisCliente(string cliente, int anio, int sucursalId)
         {
             string query = @"
@@ -299,19 +215,20 @@ namespace WPF_PAR.Core.Services // O el namespace donde decidas ponerlo
                 MAX(v.FechaEmision) as UltimaCompra,
                 ISNULL(SUM(
                     CASE 
-                        WHEN v.Mov LIKE '%Devoluci%n%' OR v.Mov LIKE '%Bonifica%' THEN ((vd.Cantidad * vd.Precio) * -1)
-                        ELSE (vd.Cantidad * vd.Precio)
+                        WHEN v.Mov LIKE '%Devoluci%n%' OR v.Mov LIKE '%Bonifica%' THEN (((vd.Cantidad * vd.Precio) / 1.16) * -1)
+                        ELSE ((vd.Cantidad * vd.Precio) / 1.16)
                     END
-                ), 0) AS TicketPromedio -- OJO: Traemos el Total aquí y dividimos en C#
+                ), 0) AS TicketPromedio
             FROM Venta v
             JOIN VentaD vd ON v.ID = vd.ID
             JOIN Cte c ON v.Cliente = c.Cliente
             WHERE 
                 v.Estatus = 'CONCLUIDO'
                 AND v.Ejercicio = @Anio
-                AND c.Nombre = @NombreCliente
+                AND c.Cliente = @NombreCliente
                 AND (@Sucursal = 0 OR vd.Sucursal = @Sucursal)
-                AND v.Mov NOT LIKE '%Pedido%' 
+                AND v.Mov NOT LIKE '%Pedido%'
+                AND v.Mov NOT LIKE '%Traslado%'
                 AND v.Mov NOT LIKE '%Cotiza%'";
 
             var parametros = new { Anio = anio, NombreCliente = cliente, Sucursal = sucursalId };
@@ -331,7 +248,6 @@ namespace WPF_PAR.Core.Services // O el namespace donde decidas ponerlo
                 TicketPromedio = frecuencia > 0 ? total / frecuencia : 0
             };
         }
-
         public async Task<List<ProductoAnalisisModel>> ObtenerVariacionProductos(string cliente, DateTime inicio, DateTime fin, int sucursalId)
         {
             DateTime inicioAnt = inicio.AddYears(-1);
@@ -342,12 +258,12 @@ namespace WPF_PAR.Core.Services // O el namespace donde decidas ponerlo
                 vd.Articulo,
                 ISNULL((SELECT TOP 1 Descripcion1 FROM Art WHERE Articulo = vd.Articulo), vd.Articulo) as Descripcion,
                 
-                SUM(CASE WHEN v.FechaEmision >= @Inicio AND v.FechaEmision <= @Fin THEN 
-                    (CASE WHEN v.Mov LIKE '%Devoluci%n%' THEN ((vd.Cantidad * vd.Precio)*-1) ELSE (vd.Cantidad * vd.Precio) END)
+               SUM(CASE WHEN v.FechaEmision >= @Inicio AND v.FechaEmision <= @Fin THEN 
+                    (CASE WHEN v.Mov LIKE '%Devoluci%n%' THEN (((vd.Cantidad * vd.Precio) / 1.16)*-1) ELSE ((vd.Cantidad * vd.Precio) / 1.16) END)
                 ELSE 0 END) as VentaActual,
                 
                 SUM(CASE WHEN v.FechaEmision >= @InicioAnt AND v.FechaEmision <= @FinAnt THEN 
-                    (CASE WHEN v.Mov LIKE '%Devoluci%n%' THEN ((vd.Cantidad * vd.Precio)*-1) ELSE (vd.Cantidad * vd.Precio) END)
+                    (CASE WHEN v.Mov LIKE '%Devoluci%n%' THEN (((vd.Cantidad * vd.Precio) / 1.16)*-1) ELSE ((vd.Cantidad * vd.Precio) / 1.16) END)
                 ELSE 0 END) as VentaAnterior
 
             FROM VentaD vd
@@ -359,9 +275,11 @@ namespace WPF_PAR.Core.Services // O el namespace donde decidas ponerlo
                      (v.FechaEmision >= @Inicio AND v.FechaEmision <= @Fin) OR 
                      (v.FechaEmision >= @InicioAnt AND v.FechaEmision <= @FinAnt)
                     )
-                AND c.Nombre = @NombreCliente
+                AND c.Cliente = @NombreCliente
                 AND (@Sucursal = 0 OR vd.Sucursal = @Sucursal)
                 AND v.Mov NOT LIKE '%Pedido%'
+                AND v.Mov NOT LIKE '%Carta Porte%'
+                AND v.Mov NOT LIKE '%Traslado%'
             GROUP BY vd.Articulo
             HAVING SUM(CASE WHEN v.FechaEmision >= @Inicio AND v.FechaEmision <= @Fin THEN (vd.Cantidad * vd.Precio) ELSE 0 END) <> 0 
                 OR SUM(CASE WHEN v.FechaEmision >= @InicioAnt AND v.FechaEmision <= @FinAnt THEN (vd.Cantidad * vd.Precio) ELSE 0 END) <> 0";
@@ -378,106 +296,189 @@ namespace WPF_PAR.Core.Services // O el namespace donde decidas ponerlo
 
             return await _sqlHelper.QueryAsync<ProductoAnalisisModel>(query, parametros);
         }
-
         public async Task<List<VentaReporteModel>> ObtenerVentasRangoAsync(int sucursalId, DateTime inicio, DateTime fin)
         {
             string filtroSucursal = sucursalId > 0 ? "AND v.Sucursal = @Sucursal" : "";
 
             string query = $@"
-    SELECT 
-        v.FechaEmision, 
-        vd.Sucursal,
-        ISNULL(c.Nombre, 'Cliente General') as Cliente,
-        
-        -- NUEVO 1: Traemos al Agente/Vendedor
-        ISNULL(a.Nombre, 'SIN AGENTE') as Agente, 
-        
-        v.MovID,
-        v.Mov,
-        vd.Articulo,
-        
-        -- DINERO QUE ENTRA (Ventas)
-        ISNULL(SUM(
-            CASE 
-                WHEN v.Mov LIKE '%Devoluci%n%' OR v.Mov LIKE '%Bonifica%' 
-                THEN ((vd.Cantidad * vd.Precio) * (1 - (ISNULL(vd.DescuentoLinea, 0) / 100.0)))
-                ELSE (vd.Cantidad * vd.Precio)
-            END
-        ), 0) AS TotalVenta,
-
-        -- NUEVO 2: DINERO QUE CUESTA (Costo)
-        ISNULL(SUM(
-            CASE 
-                WHEN v.Mov LIKE '%Devoluci%n%' OR v.Mov LIKE '%Bonifica%' 
-                THEN ((vd.Cantidad * ISNULL(vd.Costo, 0)) * -1)
-                ELSE (vd.Cantidad * ISNULL(vd.Costo, 0))
-            END
-        ), 0) AS TotalCosto,
-
-        -- VOLUMEN (Litros/Cantidad)
-        ISNULL(SUM(
-            CASE 
-                WHEN v.Mov LIKE '%Devoluci%n%' THEN (vd.Cantidad * -1)
-                WHEN v.Mov LIKE '%Bonifica%' THEN 0 
-                ELSE vd.Cantidad
-            END
-        ), 0) AS LitrosTotal
-
-    FROM VentaD vd
-    JOIN Venta v ON vd.ID = v.ID
-    LEFT JOIN Cte c ON v.Cliente = c.Cliente
-    LEFT JOIN Agente a ON vd.Agente = a.Agente -- (O v.Agente si ves nulos)
-    WHERE 
-        v.Estatus = 'CONCLUIDO'
-        {filtroSucursal}
-        AND v.FechaEmision >= @Inicio 
-        AND v.FechaEmision < DATEADD(day, 1, @Fin)
-        AND v.Mov NOT LIKE '%Pedido%'
-        AND v.Mov NOT LIKE '%Venta Perdida%'
-        AND v.Mov NOT LIKE '%Cotiza%'
-        AND v.Mov NOT LIKE '%Carta Porte%'
-    GROUP BY 
-        v.FechaEmision, vd.Sucursal, c.Nombre, a.Nombre, v.MovID, v.Mov, vd.Articulo";
+SELECT     
+    -- 💉 LA INYECCIÓN MAESTRA: Toma el día original de emisión y le suma la hora del registro
+    DATEADD(hour, DATEPART(hour, COALESCE(v.FechaRegistro, v.UltimoCambio, '1900-01-01 00:00:00')), v.FechaEmision) AS FechaEmision,     
+    
+    vd.Sucursal,    
+    ISNULL(c.Nombre, 'Cliente General') as Cliente,            
+    ISNULL(a.Nombre, 'SIN AGENTE') as Agente,             
+    v.MovID,    
+    v.Mov,    
+    vd.Articulo,            
+    ISNULL(SUM(        
+        CASE             
+            WHEN v.Mov LIKE '%Devoluci%n%' OR v.Mov LIKE '%Bonifica%'             
+            THEN (((vd.Cantidad * vd.Precio) / 1.16) * (1 - (ISNULL(vd.DescuentoLinea, 0) / 100.0)))            
+            ELSE ((vd.Cantidad * vd.Precio) / 1.16)        
+        END    
+    ), 0) AS TotalVenta,    
+    ISNULL(SUM(        
+        CASE             
+            WHEN v.Mov LIKE '%Devoluci%n%' OR v.Mov LIKE '%Bonifica%'             
+            THEN ((vd.Cantidad * ISNULL(vd.Costo, 0)) * -1)            
+            ELSE (vd.Cantidad * ISNULL(vd.Costo, 0))        
+        END    
+    ), 0) AS TotalCosto,    
+    ISNULL(SUM(        
+        CASE             
+            WHEN v.Mov LIKE '%Devoluci%n%' THEN (vd.Cantidad * -1)            
+            WHEN v.Mov LIKE '%Bonifica%' THEN 0             
+            ELSE vd.Cantidad        
+        END    
+    ), 0) AS Cantidad
+FROM VentaD vd
+JOIN Venta v ON vd.ID = v.ID
+LEFT JOIN Cte c ON v.Cliente = c.Cliente
+LEFT JOIN Agente a ON vd.Agente = a.Agente 
+WHERE     
+    v.Estatus = 'CONCLUIDO'    
+    {filtroSucursal}    
+    AND v.FechaEmision >= @Inicio     
+    AND v.FechaEmision < DATEADD(day, 1, @Fin)    
+    AND v.Mov NOT LIKE '%Pedido%'    
+    AND v.Mov NOT LIKE '%Venta Perdida%'    
+    AND v.Mov NOT LIKE '%Cotiza%'    
+    AND v.Mov NOT LIKE '%Carta Porte%'
+    AND v.Mov NOT LIKE '%Traslado%'
+GROUP BY    
+    v.FechaEmision, v.FechaRegistro, v.UltimoCambio, vd.Sucursal, c.Nombre, a.Nombre, v.MovID, v.Mov, vd.Articulo";
 
             var parametros = new { Sucursal = sucursalId, Inicio = inicio, Fin = fin };
             return await _sqlHelper.QueryAsync<VentaReporteModel>(query, parametros);
         }
-
-        public async Task<List<VentaReporteModel>> ObtenerVentaAnualAsync(int sucursalId, int anio)
+        public async Task<List<ClienteHistorialCacheModel>> DescargarHistorialTodosLosClientes(int sucursalId)
         {
+        // 1. LA CONSULTA MAESTRA: Trae 5 años de todos los clientes de golpe
             string query = @"
-     SELECT 
-        v.Periodo AS Mov, -- Truco: Usamos la propiedad Mov para guardar el numero de mes
+        SELECT 
+            c.Cliente,
+            c.Nombre AS NombreCliente,
+            v.Ejercicio AS Anio,
+            MONTH(v.FechaEmision) AS Mes,
         
-        -- APLICAMOS LA REGLA DE DEVOLUCIONES
-        ISNULL(SUM(
-            CASE 
-                WHEN v.Mov LIKE '%Devoluci%n%' OR v.Mov LIKE '%Bonifica%' THEN (v.PrecioTotal * -1)
-                ELSE v.PrecioTotal
-            END
-        ), 0) AS PrecioUnitario -- Truco: Usamos PrecioUnitario para guardar el total
+            ISNULL(SUM(
+                CASE 
+                    WHEN v.Mov LIKE '%Devoluci%n%' OR v.Mov LIKE '%Bonifica%' THEN (((vd.Cantidad * vd.Precio) / 1.16) * -1)
+                    ELSE ((vd.Cantidad * vd.Precio) / 1.16)
+                END
+            ), 0) AS Venta,
+        
+            ISNULL(SUM(
+                CASE 
+                    WHEN v.Mov LIKE '%Devoluci%n%' THEN (vd.Cantidad * -1)
+                    WHEN v.Mov LIKE '%Bonifica%' THEN 0 
+                    ELSE vd.Cantidad
+                END
+            ), 0) AS Litros
 
-    FROM Venta v
-    WHERE 
-        v.Estatus = 'CONCLUIDO'
-        AND v.Sucursal = @Sucursal 
-        AND v.Ejercicio = @Ejercicio 
-        -- MEJORAMOS EL FILTRO (Igual que en los clientes)
-        AND (v.Mov LIKE 'Factura%' OR v.Mov LIKE 'Remisi%n%' OR v.Mov LIKE 'Nota%' OR v.Mov LIKE '%Devoluci%n%' OR v.Mov LIKE '%Bonifica%')
-    GROUP BY v.Periodo
-    ORDER BY v.Periodo";
+        FROM VentaD vd
+        JOIN Venta v ON vd.ID = v.ID
+        JOIN Cte c ON v.Cliente = c.Cliente
+        WHERE 
+            v.Estatus = 'CONCLUIDO'
+            AND (@Sucursal = 0 OR vd.Sucursal = @Sucursal)
+            AND v.Mov NOT LIKE '%Pedido%' 
+            AND v.Mov NOT LIKE '%Cotiza%'
+            AND v.Mov NOT LIKE '%Carta Porte%'
+            AND v.Mov NOT LIKE '%Traslado%'
+            AND v.Ejercicio >= (YEAR(GETDATE()) - 4)
+        GROUP BY 
+            c.Cliente, c.Nombre, v.Ejercicio, MONTH(v.FechaEmision)";
 
-            var parametros = new { Sucursal = sucursalId, Ejercicio = anio };
+            var parametros = new { Sucursal = sucursalId };
+            var datosCrudos = await _sqlHelper.QueryAsync<dynamic>(query, parametros);
+            var resultadoCache = new List<ClienteHistorialCacheModel>();
+            var datosPorCliente = datosCrudos.GroupBy(x => (string)x.Cliente);
 
-            var datos = await _sqlHelper.QueryAsync<VentaReporteModel>(query, parametros);
-
-            foreach (var d in datos)
+            foreach (var grupo in datosPorCliente)
             {
-                d.Cantidad = 1;
-                d.Descuento = 0;
-                d.FechaEmision = new DateTime(anio, 1, 1);
+                string claveReal = grupo.Key;
+                string nombreReal = (string)grupo.First().NombreCliente;
+
+                var historialDelCliente = grupo.Select(x => new HistoricoClienteModel
+                {
+                    Anio = (int)x.Anio,
+                    Mes = (int)x.Mes,
+                    Venta = (decimal)x.Venta,
+                    Litros = (double)x.Litros
+                }).ToList();
+
+                resultadoCache.Add(new ClienteHistorialCacheModel
+                {
+                    ClaveCliente = claveReal,
+                    NombreCliente = nombreReal,
+                    JsonHistorico = JsonConvert.SerializeObject(historialDelCliente)
+                });
             }
-            return datos;
+
+            return resultadoCache;
         }
+        public async Task<List<VentaReporteModel>> DescargarHistorialCrudoAsync(int sucursalId)
+        {
+            // 1. Agrupamos por Artículo en SQL para no traer millones de tickets (quitamos el JOIN con Art)
+            string sqlIntelisis = @"
+        SELECT 
+            YEAR(v.FechaEmision) AS Anio,
+            MONTH(v.FechaEmision) AS Mes,
+            vd.Articulo,
+            
+            ISNULL(SUM(
+                CASE 
+                    WHEN v.Mov LIKE '%Devoluci%n%' OR v.Mov LIKE '%Bonifica%' THEN (((vd.Cantidad * vd.Precio) / 1.16) * -1)
+                    ELSE ((vd.Cantidad * vd.Precio) / 1.16)
+                END
+            ), 0) AS TotalVenta,
+            
+            ISNULL(SUM(
+                CASE 
+                    WHEN v.Mov LIKE '%Devoluci%n%' THEN (vd.Cantidad * -1)
+                    WHEN v.Mov LIKE '%Bonifica%' THEN 0 
+                    ELSE vd.Cantidad
+                END
+            ), 0) AS LitrosTotales
+
+        FROM VentaD vd
+        JOIN Venta v ON vd.ID = v.ID
+        WHERE 
+            v.Estatus = 'CONCLUIDO'
+            AND (@SucursalId = 0 OR vd.Sucursal = @SucursalId)
+            AND v.FechaEmision >= DATEADD(year, -5, GETDATE())
+            AND (v.Mov LIKE 'Factura%' OR v.Mov LIKE 'Remisi%n%' OR v.Mov LIKE 'Nota%' OR v.Mov LIKE '%Devoluci%n%' OR v.Mov LIKE '%Bonifica%')
+        GROUP BY 
+            YEAR(v.FechaEmision), 
+            MONTH(v.FechaEmision), 
+            vd.Articulo";
+
+            var resultadosCrudos = await _sqlHelper.QueryAsync<dynamic>(sqlIntelisis, new { SucursalId = sucursalId });
+
+            var listaFinal = new List<VentaReporteModel>();
+            if (resultadosCrudos == null || !resultadosCrudos.Any()) return listaFinal;
+
+            // 2. Lo empaquetamos en tu modelo oficial (Guardando el Año y Mes en FechaEmision)
+            foreach (var r in resultadosCrudos)
+            {
+                listaFinal.Add(new VentaReporteModel
+                {
+                    Articulo = ((string)r.Articulo)?.Trim(),
+                    FechaEmision = new DateTime((int)r.Anio, (int)r.Mes, 1),
+                    TotalVenta = (decimal)r.TotalVenta,
+                    LitrosTotal = (double)r.LitrosTotales
+                });
+            }
+
+            return listaFinal;
+        }
+    }
+    public class MesFamiliaHistorico
+    {
+        public int Anio { get; set; }
+        public int Mes { get; set; }
+        public List<FamiliaResumenModel> Familias { get; set; }
     }
 }

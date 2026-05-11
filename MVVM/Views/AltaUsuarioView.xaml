@@ -1,0 +1,68 @@
+﻿<UserControl x:Class="WPF_PAR.MVVM.Views.AltaUsuarioView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+             Width="400" Background="{DynamicResource MaterialDesignPaper}">
+
+    <Grid Margin="25">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
+            <materialDesign:PackIcon Kind="AccountPlus" Width="28" Height="28" Foreground="{DynamicResource PrimaryHueMidBrush}" Margin="0,0,10,0"/>
+            <TextBlock Text="Nuevo Usuario" FontSize="20" FontWeight="Bold" VerticalAlignment="Center"/>
+        </StackPanel>
+
+        <StackPanel Grid.Row="1">
+            <TextBox Text="{Binding Nombre}" 
+                     materialDesign:HintAssist.Hint="Nombre Completo" 
+                     Style="{StaticResource MaterialDesignFloatingHintTextBox}" Margin="0,0,0,15"/>
+
+            <TextBox Text="{Binding UsuarioLogin}" 
+                     materialDesign:HintAssist.Hint="Nombre de Usuario (Login)" 
+                     Style="{StaticResource MaterialDesignFloatingHintTextBox}" Margin="0,0,0,15"/>
+
+            <TextBox Text="{Binding Password}" 
+                     materialDesign:HintAssist.Hint="Contraseña temporal" 
+                     Style="{StaticResource MaterialDesignFloatingHintTextBox}" Margin="0,0,0,15"/>
+
+            <ComboBox ItemsSource="{Binding RolesDisponibles}" 
+                      SelectedItem="{Binding RolSeleccionado}"
+                      materialDesign:HintAssist.Hint="Nivel de Acceso (Rol)" 
+                      Style="{StaticResource MaterialDesignFloatingHintComboBox}" Margin="0,0,0,20"/>
+            <TextBlock Text="Sucursales Permitidas:" 
+                      FontWeight="Bold" 
+                      Margin="0,10,0,5" 
+                      Opacity="0.8"/>
+
+            <Border BorderBrush="{DynamicResource MaterialDesignDivider}" 
+                      BorderThickness="1" 
+                      CornerRadius="4">
+                <ListBox ItemsSource="{Binding SucursalesDisponibles}" 
+                      MaxHeight="150" 
+                      ScrollViewer.VerticalScrollBarVisibility="Auto">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <CheckBox IsChecked="{Binding IsSelected}" 
+                          Content="{Binding Nombre}" 
+                          Margin="8,4"/>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </Border>
+        </StackPanel>
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,15,0,0">
+            <Button Command="{x:Static materialDesign:DialogHost.CloseDialogCommand}" 
+                    Content="Cancelar" 
+                    Style="{StaticResource MaterialDesignFlatButton}" Margin="0,0,10,0"/>
+
+            <Button Command="{Binding GuardarCommand}" 
+                    Content="Guardar Usuario" 
+                    Style="{StaticResource MaterialDesignRaisedButton}"/>
+        </StackPanel>
+    </Grid>
+</UserControl>

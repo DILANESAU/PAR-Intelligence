@@ -16,15 +16,10 @@ namespace WPF_PAR.Services
 {
     public class ExportService
     {
-        // Configuración inicial de QuestPDF (licencia comunitaria gratis)
         public ExportService()
         {
             QuestPDF.Settings.License = LicenseType.Community;
         }
-
-        // ========================================================================
-        // 1. EXPORTAR A EXCEL (.xlsx)
-        // ========================================================================
         public void ExportarExcelVentas(List<VentaReporteModel> ventas, string rutaArchivo)
         {
             using ( var workbook = new XLWorkbook() )
@@ -40,15 +35,12 @@ namespace WPF_PAR.Services
                 worksheet.Cell(1, 6).Value = "Línea";
                 worksheet.Cell(1, 7).Value = "Litros";
                 worksheet.Cell(1, 8).Value = "Importe";
-
-                // Estilo del encabezado (Fondo azul, letras blancas, negrita)
                 var rangoHeader = worksheet.Range("A1:H1");
                 rangoHeader.Style.Font.Bold = true;
                 rangoHeader.Style.Font.FontColor = XLColor.White;
                 rangoHeader.Style.Fill.BackgroundColor = XLColor.FromHtml("#1565C0");
                 rangoHeader.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
 
-                // 2. Datos
                 int row = 2;
                 foreach ( var v in ventas )
                 {
@@ -62,24 +54,16 @@ namespace WPF_PAR.Services
                     worksheet.Cell(row, 8).Value = v.TotalVenta;
                     row++;
                 }
+                worksheet.Column(8).Style.NumberFormat.Format = "$ #,##0.00";
+                worksheet.Column(7).Style.NumberFormat.Format = "#,##0.00";
 
-                // 3. Formato de Celdas
-                worksheet.Column(8).Style.NumberFormat.Format = "$ #,##0.00"; // Moneda
-                worksheet.Column(7).Style.NumberFormat.Format = "#,##0.00";   // Litros
-
-                // 4. Ajustar ancho automático
                 worksheet.Columns().AdjustToContents();
 
                 workbook.SaveAs(rutaArchivo);
             }
         }
-
-        // ========================================================================
-        // 2. EXPORTAR A PDF (Reporte Ejecutivo)
-        // ========================================================================
-        // Método Mejorado con TODA la información
         public void ExportarPdfCliente(
-            ClienteAnalisisModel cliente, // <--- ¡CAMBIO AQUÍ! Ahora es ClienteAnalisisModel
+            ClienteAnalisisModel cliente,
             KpiClienteModel kpis,
             List<VentaReporteModel> movimientos,
             List<ProductoAnalisisModel> topAumento,
@@ -91,11 +75,10 @@ namespace WPF_PAR.Services
                 container.Page(page =>
                 {
                     page.Size(PageSizes.A4);
-                    page.Margin(1.5f, Unit.Centimetre); // Margen un poco más chico para que quepa todo
+                    page.Margin(1.5f, Unit.Centimetre);
                     page.PageColor(Colors.White);
                     page.DefaultTextStyle(x => x.FontSize(10));
 
-                    // --- HEADER ---
                     page.Header().Row(row =>
                     {
                         row.RelativeItem().Column(col =>
@@ -104,18 +87,12 @@ namespace WPF_PAR.Services
                             col.Item().Text(cliente.Nombre).Black().FontSize(20).FontColor(Colors.Blue.Medium);
                             col.Item().Text($"Generado el: {DateTime.Now:dd/MM/yyyy HH:mm}").FontSize(9);
                         });
-
-                        // Si tienes logo, descomenta esto:
-                        // row.ConstantItem(100).Image("Assets/logo.png");
                     });
 
-                    // --- CONTENIDO ---
                     page.Content().PaddingVertical(1, Unit.Centimetre).Column(col =>
                     {
-                        // 1. SECCIÓN DE KPIs (Resaltados)
                         col.Item().Row(row =>
                         {
-                            // ¡CAMBIO AQUÍ! Usamos la suma de VentasMensualesActual en lugar de VentaAnualActual
                             decimal ventaAnualTotal = cliente.VentasMensualesActual?.Sum() ?? 0;
                             row.RelativeItem().Component(new KpiComponent("Venta Anual", $"{ventaAnualTotal:C2}"));
 
@@ -126,12 +103,10 @@ namespace WPF_PAR.Services
 
                         col.Item().PaddingVertical(15).LineHorizontal(1).LineColor(Colors.Grey.Lighten1);
 
-                        // 2. SECCIÓN DE OPORTUNIDADES (Aumento / Declive)
                         col.Item().PaddingBottom(5).Text("Análisis de Variación de Productos (vs Año Anterior)").Bold().FontSize(12);
 
                         col.Item().Row(row =>
                         {
-                            // Tabla Izquierda: PRODUCTOS EN DECLIVE (Riesgo)
                             row.RelativeItem().Column(c =>
                             {
                                 c.Item().Text("📉 Productos en Riesgo (Bajan)").Bold().FontColor(Colors.Red.Medium);
@@ -141,16 +116,14 @@ namespace WPF_PAR.Services
                                     foreach ( var p in topDeclive.Take(5) )
                                     {
                                         table.Cell().Text(p.Descripcion).FontSize(9);
-                                        // ¡CAMBIO AQUÍ! Calculamos la diferencia
                                         decimal dif = p.VentaActual - p.VentaAnterior;
                                         table.Cell().AlignRight().Text($"{dif:C0}").FontColor(Colors.Red.Medium).FontSize(9);
                                     }
                                 });
                             });
 
-                            row.ConstantItem(20); // Espacio
+                            row.ConstantItem(20);
 
-                            // Tabla Derecha: PRODUCTOS EN AUMENTO (Oportunidad)
                             row.RelativeItem().Column(c =>
                             {
                                 c.Item().Text("📈 Productos en Crecimiento (Suben)").Bold().FontColor(Colors.Green.Medium);
@@ -160,7 +133,6 @@ namespace WPF_PAR.Services
                                     foreach ( var p in topAumento.Take(5) )
                                     {
                                         table.Cell().Text(p.Descripcion).FontSize(9);
-                                        // ¡CAMBIO AQUÍ! Calculamos la diferencia
                                         decimal dif = p.VentaActual - p.VentaAnterior;
                                         table.Cell().AlignRight().Text($"+{dif:C0}").FontColor(Colors.Green.Medium).FontSize(9);
                                     }
@@ -170,17 +142,16 @@ namespace WPF_PAR.Services
 
                         col.Item().PaddingVertical(15).LineHorizontal(1).LineColor(Colors.Grey.Lighten1);
 
-                        // 3. DETALLE DE ÚLTIMOS MOVIMIENTOS
                         col.Item().PaddingBottom(5).Text("Últimos Movimientos Registrados").Bold().FontSize(12);
 
                         col.Item().Table(table =>
                         {
                             table.ColumnsDefinition(columns =>
                             {
-                                columns.ConstantColumn(70); // Fecha
-                                columns.RelativeColumn(3);  // Producto
-                                columns.RelativeColumn(1);  // Litros
-                                columns.RelativeColumn(1);  // Importe
+                                columns.ConstantColumn(70);
+                                columns.RelativeColumn(3);
+                                columns.RelativeColumn(1);
+                                columns.RelativeColumn(1);
                             });
 
                             table.Header(header =>
@@ -191,7 +162,7 @@ namespace WPF_PAR.Services
                                 header.Cell().Element(CellStyle).AlignRight().Text("Importe");
                             });
 
-                            foreach ( var item in movimientos.Take(100) ) // Top 100 para no hacer un libro
+                            foreach ( var item in movimientos.Take(100) )
                             {
                                 table.Cell().Element(RowStyle).Text($"{item.FechaEmision:dd/MM/yy}");
                                 table.Cell().Element(RowStyle).Text(item.Descripcion);
@@ -204,7 +175,6 @@ namespace WPF_PAR.Services
                         });
                     });
 
-                    // --- FOOTER ---
                     page.Footer().AlignCenter().Text(x =>
                     {
                         x.Span("Documento generado por PAR Intelligence - Página ");
@@ -214,19 +184,15 @@ namespace WPF_PAR.Services
             })
             .GeneratePdf(rutaArchivo);
         }
-
-        // Componente auxiliar para las cajitas de KPI en el PDF
         private class KpiComponent : IComponent
         {
             private string Title { get; }
             private string Value { get; }
-
             public KpiComponent(string title, string value)
             {
                 Title = title;
                 Value = value;
             }
-
             public void Compose(IContainer container)
             {
                 container.Border(1).BorderColor(Colors.Grey.Lighten1).Padding(10).Column(column =>

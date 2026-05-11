@@ -1,17 +1,20 @@
-﻿using System.Threading.Tasks;
+﻿using MaterialDesignThemes.Wpf;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-
-// Usings necesarios
-using WPF_PAR.Converters;    // Si AuthService está aquí
- using WPF_PAR.Core.Services;
-using WPF_PAR.Services;
+using WPF_PAR.Converters;
+using WPF_PAR.Core.Models;
+using WPF_PAR.Core.Services;
+using WPF_PAR.MVVM.Views;
+using WPF_PAR.Services; // Para acceder a la vista del Pop-up
 
 namespace WPF_PAR.MVVM.ViewModels
 {
     public class LoginViewModel : ObservableObject
     {
         private readonly AuthService _authService;
+
+        public ISnackbarMessageQueue MessageQueue { get; } = new SnackbarMessageQueue(System.TimeSpan.FromSeconds(3));
 
         // Propiedades
         private string _username;
@@ -41,72 +44,106 @@ namespace WPF_PAR.MVVM.ViewModels
         public RelayCommand LoginCommand { get; set; }
         public RelayCommand ExitCommand { get; set; }
 
-        // CONSTRUCTOR ACTUALIZADO: Recibe string connectionString
+        // CONSTRUCTOR SÚPER LIMPIO
         public LoginViewModel(AuthService authService)
         {
-            // Asignamos el servicio que nos mandó App.xaml.cs
             _authService = authService;
+            LoginCommand = new RelayCommand(async param => await EjecutarLogin(param));
+            ExitCommand = new RelayCommand(o => Application.Current.Shutdown());
+        }
 
-            LoginCommand = new RelayCommand(async param =>
+        // EL MÉTODO MAESTRO
+        private async Task EjecutarLogin(object param)
+        {
+            if (IsBusy) return;
+
+            var passwordBox = param as PasswordBox;
+            var password = passwordBox?.Password;
+
+            if (string.IsNullOrWhiteSpace(Username) || string.IsNullOrWhiteSpace(password))
             {
-                // 1. VALIDACIÓN
-                if ( IsBusy ) return;
+                ErrorMessage = "Ingresa usuario y contraseña.";
+                return;
+            }
+            IsBusy = true;
+            ErrorMessage = string.Empty;
+            await Task.Delay(800); // Delay estético
 
-                var passwordBox = param as PasswordBox;
-                var password = passwordBox?.Password;
+            try
+            {
+                // 1. LLAMADA A BD (Asegúrate de que este método ya use el PasswordHasher para verificar)
+                var usuarioEncontrado = await _authService.ValidarLoginAsync(Username, password);
+                IsBusy = false;
 
-                if ( string.IsNullOrWhiteSpace(Username) || string.IsNullOrWhiteSpace(password) )
+                if (usuarioEncontrado != null)
                 {
-                    ErrorMessage = "Ingresa usuario y contraseña.";
-                    return;
-                }
-
-                // 2. ACTIVAR SPINNER
-                IsBusy = true;
-                ErrorMessage = string.Empty;
-
-                await Task.Delay(1000); // Delay estético
-
-                try
-                {
-                    // 3. LLAMADA A BD
-                    var usuarioEncontrado = await _authService.ValidarLoginAsync(Username, password);
-
-                    IsBusy = false;
-
-                    if ( usuarioEncontrado != null )
+                    // 2. VERIFICACIÓN DE SEGURIDAD (¿Es contraseña temporal?)
+                    if (usuarioEncontrado.RequiereCambioPwd)
                     {
-                        // 4. GUARDAR EN SESIÓN
-                        Session.UsuarioActual = usuarioEncontrado;
-
-                        if ( Application.Current is App app )
+                        // Levantamos el Pop-up de cambio de contraseña
+                        var modalView = new CambiarPasswordView
                         {
-                            app.AbrirMainWindow(); // <--- Abre el Dashboard
+                            DataContext = new CambiarPasswordViewModel(usuarioEncontrado.Username)
+                        };
+
+                        // Esperamos a ver si el usuario logra cambiar la clave
+                        var resultado = await DialogHost.Show(modalView, "LoginRootDialog");
+
+                        // 🛑 LA MAGIA ANTI-CUELGUES: 
+                        // Le damos 300 milisegundos a WPF para que termine la animación de cierre del DialogHost
+                        // antes de destruir la ventana de Login.
+                        await Task.Delay(300);
+
+                        // Si canceló la ventana o falló, no lo dejamos entrar
+                        if (resultado is bool exito && exito)
+                        {
+                            // Actualizamos el modelo en memoria para que ya no pida el cambio
+                            usuarioEncontrado.RequiereCambioPwd = false;
+                            EntrarAlSistema(usuarioEncontrado);
                         }
-
-                        // Cerrar ventana actual (Login)
-                        foreach ( Window window in Application.Current.Windows )
+                        else
                         {
-                            if ( window.DataContext == this )
-                            {
-                                window.Close();
-                                break;
-                            }
+                            ErrorMessage = "Cambio de contraseña cancelado. Acceso denegado.";
+                            return;
                         }
                     }
                     else
                     {
-                        ErrorMessage = "Credenciales incorrectas.";
+                        // Si no requiere cambio, entra directo
+                        EntrarAlSistema(usuarioEncontrado);
                     }
                 }
-                catch ( System.Exception ex )
+                else
                 {
-                    IsBusy = false;
-                    ErrorMessage = $"Error de conexión: {ex.Message}";
+                    ErrorMessage = "Credenciales incorrectas.";
                 }
-            });
+            }
+            catch (System.Exception ex)
+            {
+                IsBusy = false;
+                ErrorMessage = $"Error de conexión: {ex.Message}";
+            }
+        }
 
-            ExitCommand = new RelayCommand(o => Application.Current.Shutdown());
+        // MÉTODO PARA ABRIR LA APP (Separado para no repetir código)
+        private void EntrarAlSistema(UsuarioModel usuarioValido)
+        {
+            Converters.Session.UsuarioActual = usuarioValido;
+
+            if (Application.Current is App app)
+            {
+                app.AbrirMainWindow(); // <--- Abre el Dashboard
+            }
+
+            // Cerrar ventana actual (Login)
+            foreach (Window window in Application.Current.Windows)
+            {
+                if (window.DataContext == this)
+                {
+                    window.Close();
+                    break;
+                }
+            }
         }
     }
 }

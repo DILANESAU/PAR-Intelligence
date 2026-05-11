@@ -53,11 +53,8 @@ namespace WPF_PAR.MVVM.ViewModels
             }
         }
 
-        private decimal _kpiUtilidad;
-        public decimal KpiUtilidad { get => _kpiUtilidad; set { _kpiUtilidad = value; OnPropertyChanged(); } }
-
-        private decimal _kpiMargen;
-        public decimal KpiMargen { get => _kpiMargen; set { _kpiMargen = value; OnPropertyChanged(); } }
+        private decimal _kpiPrecioPromedio;
+        public decimal KpiPrecioPromedio { get => _kpiPrecioPromedio; set { _kpiPrecioPromedio = value; OnPropertyChanged(); } }
 
         public ObservableCollection<SucursalModel> Sucursales { get; set; }
 
@@ -140,28 +137,48 @@ namespace WPF_PAR.MVVM.ViewModels
         }
         public void CargarDatosIniciales()
         {
-            if ( Sucursales.Count == 0 )
+            if (Sucursales.Count == 0)
             {
                 Sucursales.Clear();
-                Sucursales.Add(new SucursalModel { Id = 0, Nombre = "0 - TODAS - Resumen Global" });
 
                 var diccionario = _sucursalesService.CargarSucursales();
-                if ( diccionario != null )
+
+                if (diccionario != null && Converters.Session.UsuarioActual != null)
                 {
-                    foreach ( var item in diccionario )
+                    // Obtenemos la "mochila" de permisos del usuario actual
+                    var permisos = Converters.Session.UsuarioActual.SucursalesPermitidas;
+
+                    foreach (var item in diccionario)
                     {
-                        Sucursales.Add(new SucursalModel { Id = item.Key, Nombre = $"{item.Key} - {item.Value}" });
+                        // Si tiene permisos NULL (Es Jefe) O si la sucursal actual está en su mochila...
+                        if (permisos == null || permisos.Contains(item.Key))
+                        {
+                            // ...entonces sí la agregamos a su combo
+                            Sucursales.Add(new SucursalModel { Id = item.Key, Nombre = $"{item.Key} - {item.Value}" });
+                        }
                     }
                 }
 
-                int guardada = Properties.Settings.Default.SucursalDefaultId;
-                var encontrada = Sucursales.FirstOrDefault(s => s.Id == guardada);
-                SucursalSeleccionada = encontrada ?? Sucursales.First();
+                // 🛡️ PROTECCIÓN ANTI-CRASH
+                if (Sucursales.Count > 0)
+                {
+                    int guardada = Properties.Settings.Default.SucursalDefaultId;
+
+                    // Verificamos si la sucursal que tenía guardada está entre sus permitidas
+                    var encontrada = Sucursales.FirstOrDefault(s => s.Id == guardada);
+
+                    // Si la encontró, la usa. Si no, lo forzamos a su primera sucursal permitida.
+                    SucursalSeleccionada = encontrada ?? Sucursales.First();
+                }
+                else
+                {
+                    System.Windows.MessageBox.Show("No se cargaron sucursales permitidas para este módulo.", "Aviso", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
+                }
             }
         }
         public async void CargarDatos()
         {
-            if ( IsLoading ) return;
+            if (IsLoading) return;
             IsLoading = true;
             _notificationService.ShowInfo("Leyendo caché del dashboard...");
 
@@ -169,65 +186,59 @@ namespace WPF_PAR.MVVM.ViewModels
             {
                 int sucursalId = SucursalSeleccionada?.Id ?? 0;
 
-                // 1. Calcular fechas según el combobox
                 DateTime fechaInicio = DateTime.Now.Date;
                 DateTime fechaFin = DateTime.Now.Date;
-                bool agruparPorMes = false;
 
-                var datosGrafico = await _reporteServices.ObtenerTendenciaGrafica(sucursalId, PeriodoSeleccionado);
-
-                // Leemos TODO el mes en curso de la base de datos
-                var datosMesCompleto = await _reporteServices.ObtenerVentasDetalleAsync(sucursalId);
-
-                List<VentaReporteModel> datosParaKpis;
-
-                switch ( PeriodoSeleccionado )
+                switch (PeriodoSeleccionado)
                 {
                     case "Hoy":
                         fechaInicio = DateTime.Now.Date;
                         fechaFin = DateTime.Now.Date;
                         break;
                     case "Esta Semana":
-                        int diff = ( 7 + ( DateTime.Now.DayOfWeek - DayOfWeek.Monday ) ) % 7;
+                        int diff = (7 + (DateTime.Now.DayOfWeek - DayOfWeek.Monday)) % 7;
                         fechaInicio = DateTime.Now.AddDays(-1 * diff).Date;
+                        fechaFin = DateTime.Now.Date;
                         break;
                     case "Este Mes":
                         fechaInicio = new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1);
+                        int ultimoDiaMes = DateTime.DaysInMonth(fechaInicio.Year, fechaInicio.Month);
+                        fechaFin = new DateTime(DateTime.Now.Year, DateTime.Now.Month, ultimoDiaMes);
                         break;
                     case "Este Año":
                         fechaInicio = new DateTime(DateTime.Now.Year, 1, 1);
                         fechaFin = new DateTime(DateTime.Now.Year, 12, 31);
-                        agruparPorMes = true;
-                        datosParaKpis = datosMesCompleto;
                         break;
                 }
-                datosParaKpis = datosMesCompleto
-                .Where(x => x.FechaEmision.Date >= fechaInicio.Date && x.FechaEmision.Date <= fechaFin.Date)
-                .ToList();
-                // 2. Leer del caché
-                var datosActuales = await _reporteServices.ObtenerVentasDetalleAsync(sucursalId);
 
-                // 3. Llenar KPIs
+                var datosGrafico = await _reporteServices.ObtenerTendenciaGrafica(sucursalId, PeriodoSeleccionado);
+
+                var datosCrudos = await _reporteServices.ObtenerVentasDetalleAsync(sucursalId, fechaInicio, fechaFin);
+
+                var datosParaKpis = datosCrudos
+                    .Where(x => x.FechaEmision.Date >= fechaInicio && x.FechaEmision.Date <= fechaFin)
+                    .ToList();
+
                 KpiVentas = datosParaKpis.Sum(x => x.TotalVenta);
-                // Calculamos los litros correctamente multiplicando cantidad por los litros de la descripción
-                KpiLitros = (decimal)datosParaKpis.Sum(x => x.Cantidad * x.LitrosUnitarios);
-                KpiUtilidad = datosParaKpis.Sum(x => x.UtilidadBruta);
-                KpiMargen = KpiVentas > 0 ? (KpiUtilidad / KpiVentas) : 0;
+                KpiLitros = datosParaKpis.Sum(x => (decimal)x.Cantidad * x.LitrosUnitarios);
+                KpiPrecioPromedio = KpiLitros > 0 ? (KpiVentas / KpiLitros) : 0;
 
                 ListaVentas.Clear();
-                foreach ( var item in datosParaKpis) ListaVentas.Add(item);
+                foreach (var item in datosParaKpis)
+                {
+                    ListaVentas.Add(item);
+                }
 
                 ProcesarDatosResumen(datosParaKpis);
 
-                // 4. Dibujar gráfica con relleno de ceros
                 ConfigurarGraficoDinamico(datosGrafico, fechaInicio, fechaFin, PeriodoSeleccionado);
 
-                if ( datosActuales.Count == 0 )
+                if (datosCrudos.Count == 0)
                 {
-                    _notificationService.ShowInfo($"El caché para esta sucursal aún no ha sido procesado por el Worker.");
+                    _notificationService.ShowInfo($"El caché para esta sucursal aún no ha sido procesado.");
                 }
             }
-            catch ( Exception ex )
+            catch (Exception ex)
             {
                 _notificationService.ShowError($"Error al leer caché: {ex.Message}");
             }
@@ -263,7 +274,7 @@ namespace WPF_PAR.MVVM.ViewModels
             }
             else if (periodoTipo == "Hoy") 
             {
-                for (int i = 8; i <= 18; i++)
+                for (int i = 5; i <= 20; i++)
                 {
                     var dato = datos.FirstOrDefault(x => x.Indice == i);
                     valores.Add(dato?.Total ?? 0);
@@ -312,12 +323,13 @@ namespace WPF_PAR.MVVM.ViewModels
             OnPropertyChanged(nameof(EjeX));
             OnPropertyChanged(nameof(EjeY));
         }
-
         private void ProcesarDatosResumen(List<VentaReporteModel> datos)
         {
-            if ( datos == null || !datos.Any() )
+            if (datos == null || !datos.Any())
             {
-                KpiVentas = 0; KpiTransacciones = 0; KpiClientes = 0;
+                KpiVentas = 0;
+                KpiTransacciones = 0;
+                KpiClientes = 0;
                 TopProductosList.Clear();
                 UltimosClientesList.Clear();
                 return;
@@ -332,13 +344,21 @@ namespace WPF_PAR.MVVM.ViewModels
                 .Select(g => new TopProductoItem
                 {
                     Nombre = string.IsNullOrEmpty(g.Key) ? "Público General" : g.Key,
+                    // OJO: Si aquí te salen 0 litros, cámbialo a x.LitrosTotal como hicimos en Familias
                     Monto = (decimal)g.Sum(x => x.LitrosTotales)
                 })
                 .OrderByDescending(x => x.Monto)
                 .Take(5)
                 .ToList();
-            for ( int i = 0; i < topClientes.Count; i++ ) topClientes[i].Ranking = i + 1;
-            TopProductosList = new ObservableCollection<TopProductoItem>(topClientes);
+
+            for (int i = 0; i < topClientes.Count; i++) topClientes[i].Ranking = i + 1;
+
+            // ✅ CORRECCIÓN 1: Vaciamos la caja actual y metemos los nuevos (WPF reacciona a esto)
+            TopProductosList.Clear();
+            foreach (var item in topClientes)
+            {
+                TopProductosList.Add(item);
+            }
 
             var ultimos = datos
                 .OrderByDescending(x => x.FechaEmision)
@@ -352,9 +372,14 @@ namespace WPF_PAR.MVVM.ViewModels
                     Iniciales = ObtenerIniciales(x.Cliente)
                 })
                 .ToList();
-            UltimosClientesList = new ObservableCollection<ClienteRecienteItem>(ultimos);
-        }
 
+            // ✅ CORRECCIÓN 2: Vaciamos y rellenamos la lista de recientes
+            UltimosClientesList.Clear();
+            foreach (var item in ultimos)
+            {
+                UltimosClientesList.Add(item);
+            }
+        }
         private string ObtenerIniciales(string nombre)
         {
             if ( string.IsNullOrWhiteSpace(nombre) ) return "?";
@@ -364,7 +389,6 @@ namespace WPF_PAR.MVVM.ViewModels
             return ( partes[0][0].ToString() + partes[1][0].ToString() ).ToUpper();
         }
     }
-
-    public class TopProductoItem { public int Ranking { get; set; } public string Nombre { get; set; } public decimal Monto { get; set; } }
-    public class ClienteRecienteItem { public string Iniciales { get; set; } public string Nombre { get; set; } public DateTime Fecha { get; set; } }
+    public class TopProductoItem { public int Ranking { get; set; } public string Nombre { get; set; } public decimal Monto { get; set; } public string MontoDisplay => $"{Monto:N0} Lts"; }
+    public class ClienteRecienteItem { public string Iniciales { get; set; } public string Nombre { get; set; } public DateTime Fecha { get; set; } public string FechaDisplay => Fecha.ToString("dd MMM - hh:mm tt"); }
 }

@@ -2,8 +2,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-
-// Agregamos el Core para encontrar SucursalesService
 using WPF_PAR.Core.Services;
 using WPF_PAR.Converters;
 
@@ -11,9 +9,7 @@ namespace WPF_PAR.Services
 {
     public class FilterService : ObservableObject
     {
-        // --- EVENTO FALTANTE ---
         public event Action OnFiltrosCambiados;
-
         private int _sucursalId;
         public int SucursalId
         {
@@ -29,7 +25,12 @@ namespace WPF_PAR.Services
                 }
             }
         }
-
+        private int _sucursalSeleccionada;
+        public int SucursalSeleccionada
+        {
+            get => _sucursalSeleccionada;
+            set { _sucursalSeleccionada = value; OnPropertyChanged(); }
+        }
         private DateTime _fechaInicio;
         public DateTime FechaInicio
         {
@@ -44,7 +45,6 @@ namespace WPF_PAR.Services
                 }
             }
         }
-
         private DateTime _fechaFin;
         public DateTime FechaFin
         {
@@ -59,24 +59,18 @@ namespace WPF_PAR.Services
                 }
             }
         }
-
         private Dictionary<int, string> _listaSucursales;
         public Dictionary<int, string> ListaSucursales
         {
             get => _listaSucursales;
             set { _listaSucursales = value; OnPropertyChanged(); }
         }
-
-        // CAMBIO IMPORTANTE: Constructor recibe string para ser autónomo
         public FilterService(string connectionString)
         {
-            // 1. Instanciamos el servicio aquí mismo
             var sucursalesService = new SucursalesService(connectionString);
 
-            // 2. Cargamos las sucursales
             var todas = sucursalesService.CargarSucursales();
 
-            // 3. Lógica de permisos (Usando Session)
             if ( Session.UsuarioActual?.SucursalesPermitidas == null )
             {
                 ListaSucursales = todas;
@@ -88,12 +82,10 @@ namespace WPF_PAR.Services
                     .ToDictionary(k => k.Key, v => v.Value);
             }
 
-            // 4. Fechas por defecto
             DateTime hoy = DateTime.Now;
             FechaInicio = new DateTime(hoy.Year, hoy.Month, 1);
             FechaFin = hoy;
 
-            // 5. Inicialización de SucursalId por defecto
             if ( Properties.Settings.Default.SucursalDefaultId != 0 && ListaSucursales.ContainsKey(Properties.Settings.Default.SucursalDefaultId) )
                 SucursalId = Properties.Settings.Default.SucursalDefaultId;
             else if ( ListaSucursales.Count > 0 )

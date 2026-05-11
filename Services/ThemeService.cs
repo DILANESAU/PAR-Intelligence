@@ -13,7 +13,6 @@ namespace WPF_PAR.Services
         {
             Theme theme = _paletteHelper.GetTheme();
 
-            // Usamos el enum BaseTheme (Dark/Light)
             theme.SetBaseTheme(isDark ? BaseTheme.Dark : BaseTheme.Light);
 
             if ( isDark )
@@ -29,7 +28,6 @@ namespace WPF_PAR.Services
 
             _paletteHelper.SetTheme(theme);
 
-            // Guardar preferencia
             try
             {
                 Properties.Settings.Default.IsDarkMode = isDark;
@@ -38,8 +36,5 @@ namespace WPF_PAR.Services
             catch { }
             ThemeChanged?.Invoke(isDark);
         }
-
-
-
     }
 }

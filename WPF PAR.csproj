@@ -18,11 +18,15 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="Assets\LOGO PAR.png" />
     <None Remove="Assets\Productos.csv" />
     <None Remove="Assets\Sucursales.csv" />
   </ItemGroup>
 
   <ItemGroup>
+    <Resource Include="Assets\LOGO PAR.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Resource>
     <Resource Include="Assets\logo.ico">
       <CopyToOutputDirectory>Never</CopyToOutputDirectory>
     </Resource>
@@ -41,7 +45,6 @@
 
   <ItemGroup>
     <PackageReference Include="ClosedXML" Version="0.105.0" />
-    <PackageReference Include="CredentialManagement" Version="1.0.2" />
     <PackageReference Include="Dapper" Version="2.1.66" />
     <PackageReference Include="LiveChartsCore" Version="2.0.0-rc6.1" />
     <PackageReference Include="LiveChartsCore.SkiaSharpView" Version="2.0.0-rc6.1" />

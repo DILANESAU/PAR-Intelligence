@@ -36,6 +36,10 @@
             <v:ClientesView/>
         </DataTemplate>
 
+        <DataTemplate DataType="{x:Type vm:GestionUsuariosViewModel}">
+            <v:GestionUsuariosView />
+        </DataTemplate>
+
         <Style x:Key="RailButtonStyle" TargetType="RadioButton" BasedOn="{StaticResource MaterialDesignFlatButton}">
             <Setter Property="Height" Value="50"/>
             <Setter Property="Padding" Value="0"/>

@@ -12,5 +12,7 @@ namespace WPF_PAR.Core.Models
         public string PasswordHash { get; set; }
         public string Rol { get; set; }
         public List<int> SucursalesPermitidas { get; set; }
+        public bool RequiereCambioPwd { get; set; }
+        public bool Activo {  get; set; }
     }
 }

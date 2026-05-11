@@ -15,8 +15,7 @@ namespace WPF_PAR.Services
                 rng.GetBytes(salt);
             }
 
-            var pbkdf2 = new Rfc2898DeriveBytes(password, salt, 100000, HashAlgorithmName.SHA256);
-            byte[] hash = pbkdf2.GetBytes(20);
+            byte[] hash = Rfc2898DeriveBytes.Pbkdf2(Encoding.UTF8.GetBytes(password), salt, 100000, HashAlgorithmName.SHA256, 20);
 
             byte[] hashBytes = new byte[36];
             Array.Copy(salt, 0, hashBytes, 0, 16);
@@ -24,8 +23,6 @@ namespace WPF_PAR.Services
 
             return Convert.ToBase64String(hashBytes);
         }
-
-        // Esto verifica si la contraseña que escribió el usuario coincide con el Hash guardado en SQL
         public static bool VerifyPassword(string password, string base64Hash)
         {
             try
@@ -34,8 +31,7 @@ namespace WPF_PAR.Services
                 byte[] salt = new byte[16];
                 Array.Copy(hashBytes, 0, salt, 0, 16);
 
-                var pbkdf2 = new Rfc2898DeriveBytes(password, salt, 100000, HashAlgorithmName.SHA256);
-                byte[] hash = pbkdf2.GetBytes(20);
+                byte[] hash =  Rfc2898DeriveBytes.Pbkdf2(Encoding.UTF8.GetBytes(password), salt, 100000, HashAlgorithmName.SHA256, 20);
 
                 for (int i = 0; i < 20; i++)
                 {
