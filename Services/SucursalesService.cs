@@ -2,15 +2,12 @@
 using System.Collections.Generic;
 using System.Linq;
 
-namespace WPF_PAR.Core.Services // <--- Unificamos en el Core
+namespace WPF_PAR.Core.Services
 {
     public class SucursalesService
     {
-        // Agregamos el campo de conexión por si en el futuro quieres 
-        // cargar las sucursales desde SQL en lugar de escribirlas a mano.
         private readonly string _connectionString;
 
-        // ESTE ES EL CONSTRUCTOR QUE FALTABA
         public SucursalesService(string connectionString)
         {
             _connectionString = connectionString;
@@ -18,7 +15,6 @@ namespace WPF_PAR.Core.Services // <--- Unificamos en el Core
 
         public Dictionary<int, string> CargarSucursales()
         {
-            // DATOS INCRUSTADOS: (Tu lista original)
             var datos = new Dictionary<int, string>
             {
                 { 1210, "PAR Cuauhtemoc Veracruz" },
@@ -46,7 +42,6 @@ namespace WPF_PAR.Core.Services // <--- Unificamos en el Core
                 { 8001, "PAR Misiones" }
             };
 
-            // Lo devolvemos ordenado por ID (Key)
             return datos.OrderBy(x => x.Key).ToDictionary(x => x.Key, x => x.Value);
         }
     }

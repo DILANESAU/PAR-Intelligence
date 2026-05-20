@@ -20,7 +20,6 @@ namespace WPF_PAR.Services
                 {
                     _sucursalId = value;
                     OnPropertyChanged();
-                    // Invocar evento al cambiar
                     OnFiltrosCambiados?.Invoke();
                 }
             }
